@@ -1,0 +1,106 @@
+﻿<!-- @using HomeBudgetClient.ViewModels
+@* Currencies.razor *@
+@inject CurrenciesViewModel ViewModel
+@page "/"
+
+<PageTitle>Currencies</PageTitle>
+
+<h1>Currencies</h1>
+
+@if (ViewModel.IsBusy)
+{
+    <div class="alert alert-info" role="alert">
+        @ViewModel.BusyText
+    </div>
+}
+
+<div class="row">
+    <div class="col-md-6">
+        <h3>Currency list</h3>
+        @if (ViewModel.Currencies.Any())
+        {
+            <table class="table table-striped">
+                <thead>
+                    <tr><th>Code</th><th>Name</th><th>Symbol</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var currency in ViewModel.Currencies)
+                    {
+                        <tr>
+                            <td>@currency.Code</td>
+                            <td>@currency.Name</td>
+                            <td>@currency.Symbol</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary me-2"
+                                        @onclick="() => ViewModel.SetOperatingCurrencyCommand.Execute(currency)">
+                                    Edit
+                                </button>
+                                <button class="btn btn-sm btn-danger"
+                                        @onclick="() => DeleteCurrency(currency.Id)">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>No currencies found.</p>
+        }
+    </div>
+
+    <div class="col-md-6">
+        <h3>@(ViewModel.OperatingCurrency.Id == 0 ? "Add new currency" : "Edit currency")</h3>
+        <EditForm Model="@ViewModel.OperatingCurrency" OnValidSubmit="@SaveCurrency">
+            <div class="mb-3">
+                <label for="code" class="form-label">Code</label>
+                <InputText id="code" class="form-control" @bind-Value="ViewModel.OperatingCurrency.Code" />
+                <ValidationMessage For="@(() => ViewModel.OperatingCurrency.Code)" />
+            </div>
+            <div class="mb-3">
+                <label for="name" class="form-label">Name</label>
+                <InputText id="name" class="form-control" @bind-Value="ViewModel.OperatingCurrency.Name" />
+                <ValidationMessage For="@(() => ViewModel.OperatingCurrency.Name)" />
+            </div>
+            <div class="mb-3">
+                <label for="symbol" class="form-label">Symbol</label>
+                <InputText id="symbol" class="form-control" @bind-Value="ViewModel.OperatingCurrency.Symbol" />
+                <ValidationMessage For="@(() => ViewModel.OperatingCurrency.Symbol)" />
+            </div>
+            <div class="mb-3">
+                <button type="submit" class="btn btn-success me-2" disabled="@ViewModel.IsBusy">
+                    Save
+                </button>
+                <button type="button" class="btn btn-secondary" @onclick="ClearForm" disabled="@ViewModel.IsBusy">
+                    Clear
+                </button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await ViewModel.LoadCurrenciesAsync();
+    }
+
+    private async Task SaveCurrency()
+    {
+        await ViewModel.SaveCurrencyCommand.ExecuteAsync(null);
+        // Optionally, refresh UI after save (StateHasChanged is triggered by ViewModel property changes)
+    }
+
+    private async Task DeleteCurrency(int id)
+    {
+        await ViewModel.DeleteCurrencyCommand.ExecuteAsync(id);
+    }
+
+    private void ClearForm()
+    {
+        ViewModel.SetOperatingCurrencyCommand.Execute(null);
+    }
+}
+-->

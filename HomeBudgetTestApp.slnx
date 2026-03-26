@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="HomeBudgetClient/HomeBudgetClient.csproj">
+    <Deploy Solution="Debug|*" />
+  </Project>
+  <Project Path="HomeBudgetServer/HomeBudgetServer.csproj" />
+  <Project Path="HomeBudgetShared/HomeBudgetShared.csproj" />
+</Solution>

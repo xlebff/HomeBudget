@@ -1,0 +1,152 @@
+﻿@page "/transactions/{Id:guid}"
+@using HomeBudgetShared.Contracts
+@inject Services.ApiClient Api
+@inject NavigationManager Navigation
+@inject Services.TokenStorageService TokenStorage
+
+<div class="container mt-4">
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+        </div>
+    }
+    else if (error != null)
+    {
+        <div class="alert alert-danger">
+            <strong>Ошибка:</strong> @error
+        </div>
+        <button class="btn btn-secondary" @onclick="GoBack">Назад</button>
+    }
+    else if (transaction != null)
+    {
+        <div class="card">
+            <div class="card-header">
+                <h4>Транзакция @transaction.Id</h4>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-sm-3 fw-bold">Тип:</div>
+                    <div class="col-sm-9">@(transaction.Type == "expense" ? "Расход" : "Доход")</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-3 fw-bold">Сумма:</div>
+                    <div class="col-sm-9">@transaction.TotalAmount</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-3 fw-bold">Валюта ID:</div>
+                    <div class="col-sm-9">@transaction.CurrencyId</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-3 fw-bold">Категория ID:</div>
+                    <div class="col-sm-9">@(transaction.CategoryId?.ToString() ?? "не указана")</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-3 fw-bold">Комментарий:</div>
+                    <div class="col-sm-9">@(string.IsNullOrEmpty(transaction.Comment) ? "—" : transaction.Comment)</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-3 fw-bold">Дата:</div>
+                    <div class="col-sm-9">@transaction.Date.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-sm-3 fw-bold">Создана:</div>
+                    <div class="col-sm-9">@transaction.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                </div>
+                @if (transaction.SyncedAt.HasValue)
+                {
+                    <div class="row mb-2">
+                        <div class="col-sm-3 fw-bold">Синхронизирована:</div>
+                        <div class="col-sm-9">@transaction.SyncedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div>
+                    </div>
+                }
+                <div class="row mb-2">
+                    <div class="col-sm-3 fw-bold">Удалена:</div>
+                    <div class="col-sm-9">@(transaction.IsDeleted ? "Да" : "Нет")</div>
+                </div>
+
+                @if (transaction.Items != null && transaction.Items.Any())
+                {
+                    <hr />
+                    <h5>Позиции</h5>
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Название</th>
+                                <th>Кол-во</th>
+                                <th>Цена за ед.</th>
+                                <th>Общая сумма</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in transaction.Items)
+                            {
+                                <tr>
+                                    <td>@item.Name</td>
+                                    <td>@item.Quantity</td>
+                                    <td>@(item.UnitPrice?.ToString("F2") ?? "—")</td>
+                                    <td>@(item.TotalPrice?.ToString("F2") ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="mt-3 text-muted">Позиции не добавлены.</p>
+                }
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-secondary" @onclick="GoBack">Назад</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private DetailedTransactionResponse? transaction;
+    private bool isLoading = true;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTransaction();
+    }
+
+    private async Task LoadTransaction()
+    {
+        try
+        {
+            isLoading = true;
+            transaction = await Api.GetFromJsonAsync<DetailedTransactionResponse>($"transactions/{Id}");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            error = "Не авторизован. Пожалуйста, войдите снова.";
+            // Можно перенаправить на логин
+            // Navigation.NavigateTo("/login");
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            error = "Транзакция не найдена.";
+        }
+        catch (Exception ex)
+        {
+            error = $"Ошибка загрузки: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("transactions"); // замени на нужный путь
+    }
+}

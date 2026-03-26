@@ -1,0 +1,18 @@
+﻿@inherits LayoutComponentBase
+@inject NavigationManager Navigation
+
+<div class="page">
+    <main>
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Guid guid = Guid.Parse("cad140a2-c06e-4cf5-955c-bd8405ff0a1c");
+        Navigation.NavigateTo($"/transactions/{guid}");
+    }
+}
