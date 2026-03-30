@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using HomeBudgetShared.Resources;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HomeBudgetShared.Models
@@ -8,6 +9,7 @@ namespace HomeBudgetShared.Models
     {
         [Key]
         public Guid Id { get; set; } = Guid.NewGuid();
+
 
         [Required]
         [StringLength(3)]
@@ -21,7 +23,6 @@ namespace HomeBudgetShared.Models
         [StringLength(5)]
         public string Symbol { get; set; } = string.Empty;
 
-        public ICollection<User> Users { get; set; } = [];
 
         public Currency Clone() => (Currency)MemberwiseClone();
 
@@ -29,17 +30,26 @@ namespace HomeBudgetShared.Models
         {
             if (string.IsNullOrWhiteSpace(Code))
             {
-                return (false, $"{nameof(Code)} is required.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(Code)));
             }
 
             if (string.IsNullOrWhiteSpace(Name))
             {
-                return (false, $"{nameof(Name)} is required.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(Name)));
             }
 
             if (string.IsNullOrWhiteSpace(Symbol))
             {
-                return (false, $"{nameof(Symbol)} is required.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(Symbol)));
             }
 
             return (true, null);

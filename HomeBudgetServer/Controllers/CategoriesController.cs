@@ -4,6 +4,7 @@ using HomeBudgetShared.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using HomeBudgetServer.Data;
+using HomeBudgetServer.Resources;
 
 namespace HomeBudgetServer.Controllers
 {
@@ -23,7 +24,7 @@ namespace HomeBudgetServer.Controllers
 
             var categories = await _context.GetFilteredAsync<Category>(
                  c => c.UserId == user.Id ||
-                                  c.UserId == null);
+                      c.UserId == null);
 
             if (!categories.Any()) return NoContent();
 
@@ -36,7 +37,11 @@ namespace HomeBudgetServer.Controllers
                     Id = category.Id,
                     UserId = category.UserId,
                     Name = category.Name,
-                    Type = category.Type
+                    Type = category.Type,
+                    CreatedAt = category.CreatedAt,
+                    UpdatedAt = category.UpdatedAt,
+                    SyncedAt = category.SyncedAt,
+                    IsDeleted = category.IsDeleted
                 });
             }
 
@@ -51,8 +56,10 @@ namespace HomeBudgetServer.Controllers
             if (user == null) return Unauthorized();
 
             var category = (await _context.GetFilteredAsync<Category>(
-                c => c.UserId == user.Id &&
-                     c.Id == id)).FirstOrDefault<Category>();
+                c => (c.UserId == user.Id ||
+                      c.UserId == null) &&
+                     c.Id == id))
+                .FirstOrDefault();
 
             if (category is null) return NotFound();
 
@@ -61,7 +68,10 @@ namespace HomeBudgetServer.Controllers
                 Id = category.Id,
                 UserId = category.UserId,
                 Name = category.Name,
-                Type = category.Type
+                Type = category.Type,
+                CreatedAt = category.CreatedAt,
+                UpdatedAt = category.UpdatedAt,
+                SyncedAt = category.SyncedAt
             });
         }
 
@@ -78,7 +88,11 @@ namespace HomeBudgetServer.Controllers
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
                 Name = request.Name,
-                Type = request.Type
+                Type = request.Type,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                SyncedAt = default,
+                IsDeleted = false
             };
 
             var (IsValid, ErrorMessage) = category.Validate();
@@ -89,10 +103,11 @@ namespace HomeBudgetServer.Controllers
             var exists = await _context.GetFilteredAsync<Category>(
                 c => c.UserId == user.Id && c.Name == request.Name);
             if (exists.FirstOrDefault() is not null)
-                return Conflict($"Category with name " +
-                    $"'{request.Name}' already exists for this user.");
+                return Conflict(String.Format(
+                    Messages.Error_UniqueCategoryName,
+                    request.Name));
 
-            await _context.AddAsync<Category>(category);
+            await _context.AddAsync(category);
             await _context.SaveChangesAsync();
 
             var response = new CategoryResponse
@@ -100,10 +115,15 @@ namespace HomeBudgetServer.Controllers
                 Id = category.Id,
                 UserId = category.UserId,
                 Name = category.Name,
-                Type = category.Type
+                Type = category.Type,
+                CreatedAt = category.CreatedAt,
+                UpdatedAt = category.UpdatedAt,
+                SyncedAt = category.SyncedAt,
+                IsDeleted = category.IsDeleted
             };
 
-            return CreatedAtAction(nameof(Get), new { id = category.Id }, response);
+            return CreatedAtAction(nameof(Get), 
+                new { id = category.Id }, response);
         }
 
         // PUT: api/categories/
@@ -121,6 +141,12 @@ namespace HomeBudgetServer.Controllers
 
             existing.Name = category.Name;
             existing.Type = category.Type;
+            existing.UpdatedAt = DateTime.UtcNow;
+            existing.IsDeleted = category.IsDeleted;
+
+            var (IsValid, ErrorMessage) = existing.Validate();
+            if (!IsValid)
+                return BadRequest(ErrorMessage);
 
             await _context.SaveChangesAsync();
             return Ok(new CategoryResponse
@@ -128,7 +154,11 @@ namespace HomeBudgetServer.Controllers
                 Id = existing.Id,
                 UserId = existing.UserId,
                 Name = existing.Name,
-                Type = existing.Type
+                Type = existing.Type,
+                CreatedAt = existing.CreatedAt,
+                UpdatedAt = existing.UpdatedAt,
+                SyncedAt = existing.SyncedAt,
+                IsDeleted = existing.IsDeleted
             });
         }
 
@@ -139,12 +169,13 @@ namespace HomeBudgetServer.Controllers
             var user = await this.GetAuthenticatedUserAsync(_context);
             if (user == null) return Unauthorized();
 
-            var existing = await _context.FindAsync<Category>(id);
-            if (existing == null) return NoContent();
+            var category = await _context.FindAsync<Category>(id);
+            if (category == null) return NoContent();
 
-            if (existing.UserId != user.Id) return Forbid();
+            if (category.UserId != user.Id) return Forbid();
 
-            _context.Remove<Category>(existing);
+            category.IsDeleted = true;
+
             await _context.SaveChangesAsync();
             return NoContent();
         }

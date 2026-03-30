@@ -3,6 +3,7 @@ using System;
 using HomeBudgetShared.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HomeBudgetShared.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260327205337_CategoriesSyncPropertiesModified")]
+    partial class CategoriesSyncPropertiesModified
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -31,15 +34,12 @@ namespace HomeBudgetShared.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<DateTime?>("SyncedAt")
+                    b.Property<DateTime>("SyncedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Type")
@@ -116,9 +116,6 @@ namespace HomeBudgetShared.Migrations
 
                     b.Property<DateTime>("Date")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsConsidered")
-                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -199,7 +196,7 @@ namespace HomeBudgetShared.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("CurrencyId")
+                    b.Property<Guid>("CurrencyId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("LastSync")
@@ -277,7 +274,8 @@ namespace HomeBudgetShared.Migrations
                     b.HasOne("HomeBudgetShared.Models.Currency", "Currency")
                         .WithMany("Users")
                         .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Currency");
                 });

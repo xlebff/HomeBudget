@@ -1,0 +1,56 @@
+﻿@* @page "/transactionTest"
+@using HomeBudgetClient.Services
+@using HomeBudgetShared.Models
+@inject TransactionsViewModel ViewModel
+@inject Services.TokenStorageService TokenStorage
+
+<h3>Transactions</h3>
+
+@if (ViewModel.IsBusy)
+{
+    <div class="alert alert-info">
+        <span>@ViewModel.BusyText</span>
+        <div class="spinner-border spinner-border-sm ms-2" role="status"></div>
+    </div>
+}
+else
+{
+    @if (ViewModel.Transactions.Any())
+    {
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Category</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var transaction in ViewModel.Transactions)
+                {
+                    <tr>
+                        <td>@transaction.Date.ToShortDateString()</td>
+                        <td>@transaction.TotalAmount.ToString("C")</td>
+                        <td>@transaction.Category</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="alert alert-warning">No transactions found.</div>
+    }
+}
+
+@code {
+    //[Parameter]
+    //public Guid UserId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = await TokenStorage.GetTokenAsync();
+        if (userId is not null)
+            await ViewModel.LoadTransactionsAsync((Guid)userId);
+    }
+} *@

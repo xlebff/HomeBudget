@@ -2,7 +2,6 @@
 
     <PropertyGroup>
         <TargetFrameworks>net10.0-windows10.0.19041.0</TargetFrameworks>
-        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
         <OutputType>Exe</OutputType>
         <RootNamespace>HomeBudgetClient</RootNamespace>
@@ -61,6 +60,10 @@
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.1" />
         <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.5" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.5" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.5">
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+          <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.5" />
         <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.5" />
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
@@ -77,6 +80,22 @@
 
     <ItemGroup>
       <Folder Include="Data\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Resources\Messages.Designer.cs">
+        <DesignTime>True</DesignTime>
+        <AutoGen>True</AutoGen>
+        <DependentUpon>Messages.resx</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Update="Resources\Messages.resx">
+        <Generator>ResXFileCodeGenerator</Generator>
+        <LastGenOutput>Messages.Designer.cs</LastGenOutput>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
     </ItemGroup>
 
 </Project>

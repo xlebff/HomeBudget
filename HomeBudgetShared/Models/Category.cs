@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using HomeBudgetShared.Resources;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HomeBudgetShared.Models
@@ -12,6 +13,7 @@ namespace HomeBudgetShared.Models
         [ForeignKey(nameof(User))]
         public Guid? UserId { get; set; }
 
+
         [Required]
         [StringLength(100)]
         public string Name { get; set; } = string.Empty;
@@ -20,25 +22,53 @@ namespace HomeBudgetShared.Models
         [StringLength(10)]
         public string Type { get; set; } = "expense";
 
-        public User? User { get; set; } = null;
+
+        [Required]
+        public DateTime CreatedAt { get; set; }
+
+        [Required]
+        public DateTime UpdatedAt { get; set; }
+
+        public DateTime? SyncedAt { get; set; }
+
+
+        [Required]
+        public bool IsDeleted { get; set; } = false;
+
 
         public Category Clone() => (Category)MemberwiseClone();
 
         public (bool IsValid, string? ErrorMessage) Validate()
         {
             if (UserId == Guid.Empty)
-                return (false, $"{nameof(UserId)} is required and must be a valid GUID.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(UserId)));
 
             if (string.IsNullOrWhiteSpace(Name))
-                return (false, $"{nameof(Name)} is required.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(Name)));
+
             if (Name.Length > 100)
-                return (false, $"{nameof(Name)} cannot exceed 100 characters.");
+                return (false,
+                        String.Format(
+                            Messages.Error_TooLong,
+                            nameof(Name),
+                            100));
 
             if (string.IsNullOrWhiteSpace(Type))
-                return (false, $"{nameof(Type)} is required.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(Type)));
+
             var allowedTypes = new[] { "expense", "income" };
             if (!allowedTypes.Contains(Type.ToLowerInvariant()))
-                return (false, $"{nameof(Type)} must be either 'expense' or 'income'.");
+                return (false, $"{nameof(Type)} " +
+                    $"must be either 'expense' or 'income'.");
 
             return (true, null);
         }

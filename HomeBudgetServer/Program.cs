@@ -1,10 +1,11 @@
+using HomeBudgetServer.Resources;
 using HomeBudgetShared.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Logging;
 using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using System.Text.Json.Serialization;
 
 public partial class Program
 {
@@ -15,7 +16,8 @@ public partial class Program
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+            options.UseNpgsql(builder.Configuration
+                   .GetConnectionString("DefaultConnection")));
 
         var jwtSettings = builder.Configuration.GetSection("Jwt");
         var key = Encoding.UTF8.GetBytes(jwtSettings["Key"]!);
@@ -34,36 +36,39 @@ public partial class Program
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("my-32-character-ultra-secure-key-1234567890"))
                 };
                 options.UseSecurityTokenValidators = true;
-                options.Events = new JwtBearerEvents
-                {
-                    OnAuthenticationFailed = context =>
-                    {
-                        Console.WriteLine($"Authentication failed: {context.Exception.Message}");
-                        var raw = context.Request.Headers["Authorization"].ToString();
+                //options.Events = new JwtBearerEvents
+                //{
+                //    OnAuthenticationFailed = context =>
+                //    {
+                //        Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+                //        var raw = context.Request.Headers["Authorization"].ToString();
 
-                        Console.WriteLine($"[{raw}]");
-                        Console.WriteLine($"Length: {raw.Length}");
+                //        Console.WriteLine($"[{raw}]");
+                //        Console.WriteLine($"Length: {raw.Length}");
 
-                        foreach (var c in raw)
-                        {
-                            Console.Write($"{(int)c} ");
-                        }
-                        Console.WriteLine();
+                //        foreach (var c in raw)
+                //        {
+                //            Console.Write($"{(int)c} ");
+                //        }
+                //        Console.WriteLine();
 
-                        return Task.CompletedTask;
-                    }
-                };
+                //        return Task.CompletedTask;
+                //    }
+                //};
             });
-
-        
 
         builder.Services.AddAuthorization();
 
         builder.Services.AddEndpointsApiExplorer();
 
-        builder.Services.AddControllers();
-
         builder.Services.AddOpenApi();
+
+        builder.Services.AddControllers().AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        });
+
+        builder.Services.AddControllers();
 
         IdentityModelEventSource.ShowPII = true;
 
@@ -78,13 +83,15 @@ public partial class Program
         app.UseAuthentication();
         app.Use(async (context, next) =>
         {
-            if (context.Request.Headers.TryGetValue("Authorization", out var authHeader))
+            if (context.Request.Headers.TryGetValue(
+                "Authorization", out var authHeader))
             {
-                Console.WriteLine($"Authorization header: {authHeader}");
+                Console.WriteLine(String.Format(Messages.Log_AuthHeader,
+                    authHeader));
             }
             else
             {
-                Console.WriteLine("Authorization header missing");
+                Console.WriteLine(Messages.Error_AuthHeaderMissing);
             }
             await next();
         });

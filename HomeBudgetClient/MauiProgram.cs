@@ -19,23 +19,29 @@ namespace HomeBudgetClient
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 });
 
+            Db(builder);
+
+            Api(builder);
+
+            DebugTools(builder);
+
+            var app = builder.Build();
+
+            return app;
+        }
+
+        private static void DebugTools(MauiAppBuilder builder)
+        {
             builder.Services.AddMauiBlazorWebView();
-
-            //builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>();
-            //builder.Services.AddScoped<IAuthService, AuthService>();
-
-            builder.Services.AddScoped<TokenStorageService>();
-
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
 #endif
+        }
 
-            var dbPath = Path.Combine(FileSystem.AppDataDirectory, "HomeBudget.db3");
-            var connectionString = $"Data Source={dbPath}";
-
-            builder.Services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlite(connectionString));
+        private static void Api(MauiAppBuilder builder)
+        {
+            builder.Services.AddScoped<TokenStorageService>();
 
             builder.Services.AddScoped(sp => new HttpClient
             {
@@ -43,11 +49,19 @@ namespace HomeBudgetClient
             });
             builder.Services.AddScoped<ApiClient>();
 
-            //builder.Services.AddSingleton<CurrenciesViewModel>();
+            builder.Services.AddTransient<AuthService>();
+            builder.Services.AddTransient<SyncService>();
+        }
 
-            builder.Services.AddBlazorWebViewDeveloperTools();
+        private static void Db(MauiAppBuilder builder)
+        {
+            var dbPath = Path.Combine(FileSystem.AppDataDirectory, "HomeBudget.db3");
+            var connectionString = $"Data Source={dbPath}";
 
-            return builder.Build();
+            builder.Services.AddDbContext<AppDbContext>(options =>
+                options.UseSqlite(connectionString));
+
+            builder.Services.AddSingleton<TransactionsViewModel>();
         }
     }
 }

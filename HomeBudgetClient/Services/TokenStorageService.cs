@@ -1,18 +1,24 @@
-﻿namespace HomeBudgetClient.Services
+﻿using HomeBudgetClient.Resources;
+
+namespace HomeBudgetClient.Services
 {
     public class TokenStorageService
     {
         private const string AccessTokenKey = "access_token";
+        private const string UserId = "userId";
 
-        public async Task SaveTokenAsync(string token)
+        public async Task SaveTokenAsync(string token, Guid userId)
         {
             try
             {
                 await SecureStorage.SetAsync(AccessTokenKey, token);
+                await SecureStorage.SetAsync(UserId, userId.ToString());
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Token saving error: {ex.Message}");
+                Console.WriteLine(String.Format(
+                    Messages.Error_TokenSaving,
+                    ex.Message));
             }
         }
 
@@ -20,11 +26,37 @@
         {
             try
             {
-                return await SecureStorage.GetAsync(AccessTokenKey);
+                string? token = await SecureStorage.GetAsync(AccessTokenKey);
+
+                return token;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Token getting error: {ex.Message}");
+                Console.WriteLine(String.Format(
+                    Messages.Error_TokenGetting,
+                    ex.Message));
+                return null;
+            }
+        }
+
+        public async Task<Guid?> GetUserIdAsync()
+        {
+            try
+            {
+                string? userIdString = await SecureStorage.GetAsync(UserId);
+
+                if (userIdString is null)
+                    return null;
+
+                Guid userId = Guid.Parse(userIdString);
+
+                return userId;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(String.Format(
+                    Messages.Error_UserIdGetting,
+                    ex.Message));
                 return null;
             }
         }
@@ -34,10 +66,13 @@
             try
             {
                 SecureStorage.Remove(AccessTokenKey);
+                SecureStorage.Remove(UserId);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Token removing error: {ex.Message}");
+                Console.WriteLine(String.Format(
+                    Messages.Error_UserDataRemoving,
+                    ex.Message));
             }
         }
     }

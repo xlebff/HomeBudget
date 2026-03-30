@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using HomeBudgetShared.Resources;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace HomeBudgetShared.Models
@@ -13,9 +14,11 @@ namespace HomeBudgetShared.Models
         [ForeignKey(nameof(Transaction))]
         public Guid TransactionId { get; set; } = Guid.Empty;
 
+
         [Required]
         [StringLength(255)]
         public string Name { get; set; } = string.Empty;
+
 
         [Required]
         public int Quantity { get; set; } = 1;
@@ -26,47 +29,70 @@ namespace HomeBudgetShared.Models
         [Required]
         public decimal? TotalPrice { get; set; } = 0;
 
+
         [Required]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        [Required]
-        public bool IsDeleted { get; set; } = false;
-
-        public Transaction Transaction { get; set; } = null!;
 
         public TransactionItem Clone() => (TransactionItem)MemberwiseClone();
 
         public (bool IsValid, string? ErrorMessage) Validate()
         {
             if (TransactionId == Guid.Empty)
-                return (false, $"{nameof(TransactionId)} is required and " +
-                    $"must be a valid GUID.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(TransactionId)));
 
             if (string.IsNullOrWhiteSpace(Name))
-                return (false, $"{nameof(Name)} is required.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(Name)));
+
             if (Name.Length > 255)
-                return (false, $"{nameof(Name)} cannot exceed " +
-                    $"255 characters.");
+                return (false,
+                        String.Format(
+                            Messages.Error_TooLong,
+                            nameof(Name),
+                            255));
 
             if (Quantity <= 0)
-                return (false, $"{nameof(Quantity)} must be" +
-                    $" greater than zero.");
+                return (false,
+                        String.Format(
+                            Messages.Error_TooLittle,
+                            nameof(Quantity),
+                            0));
 
             if (UnitPrice < 0)
-                return (false, $"{nameof(UnitPrice)} cannot be negative.");
+                return (false,
+                        String.Format(
+                                Messages.Error_TooLittle,
+                                nameof(UnitPrice),
+                                0));
 
             if (TotalPrice < 0)
-                return (false, $"{nameof(TotalPrice)} cannot be negative.");
+                return (false,
+                        String.Format(
+                            Messages.Error_TooLittle,
+                            nameof(TotalPrice),
+                            0));
 
             if (CreatedAt == default)
-                return (false, $"{nameof(CreatedAt)} is required.");
+                return (false,
+                        String.Format(
+                            Messages.Error_Required,
+                            nameof(CreatedAt)));
 
             if (UnitPrice.HasValue &&
                 TotalPrice.HasValue)
             {
                 if (Math.Abs(TotalPrice.Value - UnitPrice.Value *
                     Quantity) > 0.01m)
-                    return (false, $"Price mismatch for item '{Name}'.");
+                    return (false,
+                            String.Format(
+                                Messages.Error_PriceMismatch,
+                                Name));
             }
             else if (UnitPrice.HasValue)
             {
@@ -78,10 +104,11 @@ namespace HomeBudgetShared.Models
             }
             else
             {
-                return (false, $"Either " +
-                    $"{nameof(UnitPrice)} or {nameof(TotalPrice)} " +
-                    $"must be provided for item " +
-                    $"'{Name}'");
+                return (false,
+                        String.Format(
+                            Messages.Error_EitherRequired,
+                            nameof(UnitPrice),
+                            nameof(TotalPrice)));
             }
 
             return (true, null);

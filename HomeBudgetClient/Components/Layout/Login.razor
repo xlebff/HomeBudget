@@ -4,6 +4,7 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject Services.TokenStorageService TokenStorage
+@inject Services.AuthService AuthService
 
 <div>
     <h3>Вход</h3>
@@ -31,18 +32,27 @@
         message = "";
         try
         {
-            var response = await Http.PostAsJsonAsync("http://localhost:5284/api/auth/login", new { login, password });
+            var response = await Http.PostAsJsonAsync(
+                "auth/login",
+                new { login, password });
 
             if (response.IsSuccessStatusCode)
             {
-                var loginResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                var loginResponse = await response.Content
+                .ReadFromJsonAsync<AuthResponse>();
 
-                if (loginResponse != null && !string.IsNullOrEmpty(loginResponse.Token))
+                if (loginResponse != null &&
+                    !string.IsNullOrEmpty(loginResponse.Token))
                 {
-                    await TokenStorage.SaveTokenAsync(loginResponse.Token);
+                    await TokenStorage.SaveTokenAsync(loginResponse.Token,
+                        loginResponse.UserId);
+
+                    await AuthService.AddUserAsync(loginResponse.UserId,
+                        loginResponse.Login);
+
                     token = loginResponse.Token;
                     message = "Успешный вход!";
-                    Navigation.NavigateTo("/transactions");
+                    Navigation.NavigateTo("/categories");
                 }
                 else
                 {

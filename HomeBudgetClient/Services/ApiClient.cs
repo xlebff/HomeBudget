@@ -1,18 +1,20 @@
-﻿using System.Net.Http.Headers;
+﻿using HomeBudgetShared.Contracts;
+using HomeBudgetShared.Models;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace HomeBudgetClient.Services
 {
-    internal class ApiClient
+    internal class ApiClient(HttpClient httpClient, TokenStorageService tokenStorage)
     {
-        private readonly HttpClient _httpClient;
-        private readonly TokenStorageService _tokenStorage;
+        private readonly HttpClient _httpClient = httpClient;
+        private readonly TokenStorageService _tokenStorage = tokenStorage;
 
-        public ApiClient(HttpClient httpClient, TokenStorageService tokenStorage)
+        private readonly JsonSerializerOptions jso = new()
         {
-            _httpClient = httpClient;
-            _tokenStorage = tokenStorage;
-        }
+            PropertyNameCaseInsensitive = true
+        };
 
         private async Task AddAuthorizationHeaderAsync()
         {
@@ -69,6 +71,15 @@ namespace HomeBudgetClient.Services
         {
             await AddAuthorizationHeaderAsync();
             return await _httpClient.SendAsync(request);
+        }
+
+        public async Task<List<T>> GetAsync<T>(string url)
+        {
+            var response = await GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<T>>(json, jso) ?? [];
         }
 
         public string GetBaseAddress() => _httpClient.BaseAddress?.ToString() ?? "не установлен";

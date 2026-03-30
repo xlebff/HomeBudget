@@ -23,9 +23,12 @@ namespace HomeBudgetShared.Data
                 .HasIndex(c => c.Name)
                 .IsUnique();
 
+            //modelBuilder.Entity<Currency>()
+            //    .HasIndex(i => i.Id)
+            //    .IsCreatedConcurrently();
+
             modelBuilder.Entity<Currency>()
-                .HasIndex(i => i.Id)
-                .IsCreatedConcurrently();
+                .HasIndex(i => i.Id);
 
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Login)
@@ -95,7 +98,8 @@ namespace HomeBudgetShared.Data
             await Database.EnsureCreatedAsync();
         }
 
-        public async Task<IEnumerable<TTable>> GetAllAsync<TTable>() where TTable : class
+        public async Task<IEnumerable<TTable>> GetAllAsync<TTable>()
+            where TTable : class
         {
             return await Set<TTable>().ToListAsync();
         }
@@ -106,30 +110,37 @@ namespace HomeBudgetShared.Data
             return await Set<TTable>().Where(predicate).ToListAsync();
         }
 
-        public async Task<TTable?> GetItemByKeyAsync<TTable>(object primaryKey) where TTable : class
+        public async Task<TTable?> GetItemByKeyAsync<TTable>(
+            object primaryKey)
+            where TTable : class
         {
             return await Set<TTable>().FindAsync(primaryKey);
         }
 
-        public async Task<bool> AddItemAsync<TTable>(TTable item) where TTable : class
+        public async Task<bool> AddItemAsync<TTable>(TTable item)
+            where TTable : class
         {
             await Set<TTable>().AddAsync(item);
             return await SaveChangesAsync() > 0;
         }
 
-        public async Task<bool> UpdateItemAsync<TTable>(TTable item) where TTable : class
+        public async Task<bool> UpdateItemAsync<TTable>(TTable item)
+            where TTable : class
         {
             Set<TTable>().Update(item);
             return await SaveChangesAsync() > 0;
         }
 
-        public async Task<bool> DeleteItemAsync<TTable>(TTable item) where TTable : class
+        public async Task<bool> DeleteItemAsync<TTable>(TTable item)
+            where TTable : class
         {
             Set<TTable>().Remove(item);
             return await SaveChangesAsync() > 0;
         }
 
-        public async Task<bool> DeleteItemByKeyAsync<TTable>(object primaryKey) where TTable : class
+        public async Task<bool> DeleteItemByKeyAsync<TTable>(
+            object primaryKey)
+            where TTable : class
         {
             var item = await GetItemByKeyAsync<TTable>(primaryKey);
             if (item == null) return false;

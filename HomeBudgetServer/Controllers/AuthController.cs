@@ -1,4 +1,5 @@
 ﻿using HomeBudgetServer.Data;
+using HomeBudgetServer.Resources;
 using HomeBudgetShared.Contracts;
 using HomeBudgetShared.Data;
 using HomeBudgetShared.Models;
@@ -28,7 +29,7 @@ namespace HomeBudgetServer.Controllers
             var existingUser = await _context.GetFilteredAsync<User>(
                 u => u.Login == request.Login);
             if (existingUser.Any())
-                return BadRequest("User with this email already exists.");
+                return BadRequest(Messages.Error_UniqueLogin);
 
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(
                 request.Password);
@@ -36,7 +37,7 @@ namespace HomeBudgetServer.Controllers
                 c => c.Code == "RUB")).FirstOrDefault();
 
             if (currency == null)
-                return BadRequest($"Unable to register {request.Login}");
+                return BadRequest(Messages.Error_InvalidCurrencyId);
 
             var user = new User
             {
@@ -67,12 +68,12 @@ namespace HomeBudgetServer.Controllers
                 (u => u.Login == request.Login)).
                 FirstOrDefault();
             if (user == null)
-                return Unauthorized("Invalid email or password.");
+                return Unauthorized(Messages.Error_InvalidEmailOrPassword);
 
             bool isValidPassword = BCrypt.Net.BCrypt.Verify(
                 request.Password, user.PasswordHash);
             if (!isValidPassword)
-                return Unauthorized("Invalid email or password.");
+                return Unauthorized(Messages.Error_InvalidEmailOrPassword);
 
             var token = GenerateJwtToken(user);
 
@@ -90,14 +91,18 @@ namespace HomeBudgetServer.Controllers
         public async Task<IActionResult> EditCurrency([FromRoute] Guid? id)
         {
             var user = await this.GetAuthenticatedUserAsync(_context);
-            if (user == null) return Unauthorized();
+            if (user == null) 
+                return Unauthorized();
 
-            if (!id.HasValue) return BadRequest("Invalid currency id.");
+            if (!id.HasValue) 
+                return BadRequest(Messages.Error_InvalidCurrencyId);
 
             var currency = await _context.Currencies.FindAsync(id);
 
-            if (currency is null) return BadRequest(
-                $"No currency with id \"{id}\" found.");
+            if (currency is null)
+                return BadRequest(String.Format(
+                    Messages.Error_InvalidCurrencyId,
+                    id));
 
             user.CurrencyId = (Guid)id;
 
