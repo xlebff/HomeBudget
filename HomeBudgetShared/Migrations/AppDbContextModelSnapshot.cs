@@ -105,7 +105,6 @@ namespace HomeBudgetShared.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Comment")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
@@ -128,11 +127,6 @@ namespace HomeBudgetShared.Migrations
 
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("numeric");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -161,12 +155,6 @@ namespace HomeBudgetShared.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
@@ -186,8 +174,6 @@ namespace HomeBudgetShared.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsDeleted");
-
                     b.HasIndex("TransactionId");
 
                     b.ToTable("transaction_items");
@@ -201,9 +187,6 @@ namespace HomeBudgetShared.Migrations
 
                     b.Property<Guid?>("CurrencyId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("LastSync")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Login")
                         .IsRequired()
@@ -227,76 +210,52 @@ namespace HomeBudgetShared.Migrations
 
             modelBuilder.Entity("HomeBudgetShared.Models.Category", b =>
                 {
-                    b.HasOne("HomeBudgetShared.Models.User", "User")
-                        .WithMany("Categories")
+                    b.HasOne("HomeBudgetShared.Models.User", null)
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("HomeBudgetShared.Models.Transaction", b =>
                 {
-                    b.HasOne("HomeBudgetShared.Models.Category", "Category")
+                    b.HasOne("HomeBudgetShared.Models.Category", null)
                         .WithMany()
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("HomeBudgetShared.Models.Currency", "Currency")
+                    b.HasOne("HomeBudgetShared.Models.Currency", null)
                         .WithMany()
                         .HasForeignKey("CurrencyId")
-                        .OnDelete(DeleteBehavior.SetNull)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("HomeBudgetShared.Models.User", "User")
-                        .WithMany("Transactions")
+                    b.HasOne("HomeBudgetShared.Models.User", null)
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Category");
-
-                    b.Navigation("Currency");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("HomeBudgetShared.Models.TransactionItem", b =>
                 {
-                    b.HasOne("HomeBudgetShared.Models.Transaction", "Transaction")
+                    b.HasOne("HomeBudgetShared.Models.Transaction", null)
                         .WithMany("Items")
                         .HasForeignKey("TransactionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Transaction");
                 });
 
             modelBuilder.Entity("HomeBudgetShared.Models.User", b =>
                 {
-                    b.HasOne("HomeBudgetShared.Models.Currency", "Currency")
-                        .WithMany("Users")
+                    b.HasOne("HomeBudgetShared.Models.Currency", null)
+                        .WithMany()
                         .HasForeignKey("CurrencyId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Currency");
-                });
-
-            modelBuilder.Entity("HomeBudgetShared.Models.Currency", b =>
-                {
-                    b.Navigation("Users");
                 });
 
             modelBuilder.Entity("HomeBudgetShared.Models.Transaction", b =>
                 {
                     b.Navigation("Items");
-                });
-
-            modelBuilder.Entity("HomeBudgetShared.Models.User", b =>
-                {
-                    b.Navigation("Categories");
-
-                    b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618
         }

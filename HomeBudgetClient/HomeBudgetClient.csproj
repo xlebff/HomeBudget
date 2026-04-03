@@ -83,17 +83,33 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Update="Resources\Messages.Designer.cs">
+      <MauiImage Include="wwwroot\bg.jpg">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </MauiImage>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="wwwroot\bg.jpg" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Resources\ClientMessages.Designer.cs">
         <DesignTime>True</DesignTime>
         <AutoGen>True</AutoGen>
-        <DependentUpon>Messages.resx</DependentUpon>
+        <DependentUpon>ClientMessages.resx</DependentUpon>
       </Compile>
     </ItemGroup>
 
     <ItemGroup>
-      <EmbeddedResource Update="Resources\Messages.resx">
+      <Content Update="wwwroot\bg.jpg">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Update="Resources\ClientMessages.resx">
         <Generator>ResXFileCodeGenerator</Generator>
-        <LastGenOutput>Messages.Designer.cs</LastGenOutput>
+        <LastGenOutput>ClientMessages.Designer.cs</LastGenOutput>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </EmbeddedResource>
     </ItemGroup>

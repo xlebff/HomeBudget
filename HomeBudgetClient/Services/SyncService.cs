@@ -58,21 +58,25 @@ namespace HomeBudgetClient.Services
 
         private async Task<(SyncStatus, string?)> CurrenciesSyncAsync()
         {
-            var apiCurrencies = await _client.GetAsync<Currency>("currencies");
+            List<Currency>? apiCurrencies =
+                await _client.GetAsync<Currency>("currencies");
 
-            if (apiCurrencies is null || apiCurrencies.Count == 0)
+            if (apiCurrencies is null ||
+                apiCurrencies.Count == 0)
+            {
                 return (SyncStatus.Failed,
-                    Messages.Error_InvalidRequestResult);
+                        ClientMessages.Error_InvalidRequestResult);
+            }
 
-            var localCurrencies = await _context.Currencies
-                .ToDictionaryAsync(c => c.Id);
+            Dictionary<Guid, Currency> localCurrenciesIdDict =
+                await _context.Currencies.ToDictionaryAsync(c => c.Id);
 
-            var anyChanges = false;
+            bool anyChanges = false;
 
             // from server
-            foreach (var apiCurrency in apiCurrencies)
+            foreach (Currency apiCurrency in apiCurrencies)
             {
-                if (localCurrencies.TryGetValue(apiCurrency.Id,
+                if (localCurrenciesIdDict.TryGetValue(apiCurrency.Id,
                     out var localCurrency))
                 {
                     // if any changes in existing
@@ -96,7 +100,7 @@ namespace HomeBudgetClient.Services
 
             if (!anyChanges)
                 return (SyncStatus.NothingToSync,
-                    Messages.Info_NoContentToSync);
+                        ClientMessages.Info_NoContentToSync);
 
             try
             {
@@ -118,7 +122,7 @@ namespace HomeBudgetClient.Services
                 apiCategories.Count == 0)
             {
                 return (SyncStatus.Failed,
-                    Messages.Error_InvalidRequestResult);
+                    ClientMessages.Error_InvalidRequestResult);
             }
 
             Dictionary<Guid, Category> localCategoriesIdDict = 
@@ -131,19 +135,8 @@ namespace HomeBudgetClient.Services
                 localCategoriesIdDict.Count == 0)
             {
                 return (SyncStatus.NothingToSync,
-                    Messages.Info_NoContentToSync);
+                        ClientMessages.Info_NoContentToSync);
             }
-
-            //User user;
-            //if (await GetUser() is User userTmp)
-            //{
-            //    user = userTmp;
-            //} 
-            //else
-            //{
-            //    return (SyncStatus.Failed,
-            //        Messages.Error_UserIdGetting);
-            //}
 
             bool localChanges = false;
             bool apiChanges = false;
@@ -181,7 +174,7 @@ namespace HomeBudgetClient.Services
                     // everything is up do date, sync time updating
                     else
                     {
-                        if (localCategory.SyncedAt == null || 
+                        if (localCategory.SyncedAt is null || 
                             localCategory.SyncedAt < syncTime)
                         {
                             localCategory.SyncedAt = syncTime;
@@ -194,7 +187,6 @@ namespace HomeBudgetClient.Services
                 {
                     Category newCategory = 
                         CreateCategory(apiCategory, syncTime);
-                    //newCategory.User = user;
 
                     await _context.Categories.AddAsync(newCategory);
 
@@ -211,7 +203,6 @@ namespace HomeBudgetClient.Services
                 // no remotely
                 Category newCategory = 
                     CreateCategory(localCategory, syncTime);
-                //newCategory.User = await _client.GetAsync();
 
                 await _client.PutAsync(
                     $"categories/{localCategory.Id}",
@@ -242,28 +233,28 @@ namespace HomeBudgetClient.Services
 
         private async Task<(SyncStatus, string?)> TransactionsSyncAsync()
         {
-            List<DetailedTransactionResponse>? apiTransactionsResponse = 
-                await _client.GetAsync<DetailedTransactionResponse>("transactions");
+            List<Transaction>? apiTransactions = 
+                await _client.GetAsync<Transaction>("transactions");
 
-            if (apiTransactionsResponse is null)
+            if (apiTransactions is null)
             {
                 return (SyncStatus.Failed,
-                        Messages.Error_InvalidRequestResult);
+                        ClientMessages.Error_InvalidRequestResult);
             }
 
-            Dictionary<Guid, DetailedTransactionResponse> apiTransactionsIdDict =
-                apiTransactionsResponse.ToDictionary(t => t.Id);
+            Dictionary<Guid, Transaction> apiTransactionsIdDict =
+                apiTransactions.ToDictionary(t => t.Id);
 
             Dictionary<Guid, Transaction> localTransactionsIdDict =
                 await _context.Transactions
                               .Include(t => t.Items)
                               .ToDictionaryAsync(t => t.Id);
 
-            if (apiTransactionsResponse.Count == 0 &&
+            if (apiTransactions.Count == 0 &&
                 localTransactionsIdDict.Count == 0)
             {
                 return (SyncStatus.NothingToSync,
-                        Messages.Info_NoContentToSync);
+                        ClientMessages.Info_NoContentToSync);
             }
 
             bool localChanges = false;
@@ -271,8 +262,7 @@ namespace HomeBudgetClient.Services
 
             DateTime syncTime = DateTime.UtcNow;
 
-            foreach (DetailedTransactionResponse apiTransaction in
-                apiTransactionsIdDict.Values)
+            foreach (Transaction apiTransaction in apiTransactions)
             {
                 if (localTransactionsIdDict.TryGetValue(
                     apiTransaction.Id,
@@ -295,69 +285,65 @@ namespace HomeBudgetClient.Services
                     else if (apiTransaction.UpdatedAt >
                              localTransaction.UpdatedAt)
                     {
-                        Transaction newTransaction = CreateTransaction(
-                            apiTransaction,
-                            syncTime);
+                        _context.TransactionItems
+                            .RemoveRange(localTransaction.Items);
 
-                        var (IsValid, ErrorMessage) = newTransaction.Validate();
-                        if (!IsValid)
+                        localTransaction.Items.Clear();
+
+                        List<TransactionItem> items = [];
+
+                        foreach (TransactionItem item in apiTransaction.Items)
                         {
-                            return (SyncStatus.Failed,
-                                $"Transaction {localTransaction.Id}: {ErrorMessage}");
+                            items.Add(item);
                         }
 
-                        foreach (var item in localTransaction.Items)
-                        {
-                            var (itemValid, itemError) = item.Validate();
-                            if (!itemValid)
-                            {
-                                return (SyncStatus.Failed,
-                                    $"Transaction item {item.Id}: {itemError}");
-                            }
-                        }
+                        await _context.TransactionItems.AddRangeAsync(items);
 
-                        anyLocalChanges = true;
+                        _context.Entry(localTransaction).CurrentValues
+                            .SetValues(apiTransaction);
+
+                        localTransaction.Items = items;
+
+                        localTransaction.SyncedAt = syncTime;
+
+                        localChanges = true;
                     }
                     else
                     {
-                        // Одинаковая версия -> просто фиксируем sync time
                         if (localTransaction.SyncedAt is null ||
                             localTransaction.SyncedAt < syncTime)
                         {
                             localTransaction.SyncedAt = syncTime;
-                            anyLocalChanges = true;
+                            localChanges = true;
                         }
                     }
                 }
+                // no local
                 else
                 {
-                    // Есть на сервере, нет локально -> добавляем локально
-                    var newLocalTransaction =
-                        MapApiTransactionToLocal(apiTransaction, syncTime);
+                    Transaction newTransaction = apiTransaction.Clone();
+                    await _context.AddAsync(newTransaction);
 
-                    var (isValid, error) = newLocalTransaction.Validate();
-                    if (!isValid)
-                        return (SyncStatus.Failed,
-                            $"Transaction {newLocalTransaction.Id}: {error}");
+                    List<TransactionItem> items = [];
 
-                    foreach (var item in newLocalTransaction.Items)
+                    foreach (TransactionItem item in apiTransaction.Items)
                     {
-                        var (itemValid, itemError) = item.Validate();
-                        if (!itemValid)
-                        {
-                            return (SyncStatus.Failed,
-                                $"Transaction item {item.Id}: {itemError}");
-                        }
+                        items.Add(item);
                     }
 
-                    await _context.Transactions.AddAsync(newLocalTransaction);
-                    anyLocalChanges = true;
+                    newTransaction.Items = items;
+
+                    await _context.TransactionItems.AddRangeAsync(items);
+
+                    localChanges = true;
                 }
             }
 
-            // 2. Обрабатываем записи, которые есть локально, но отсутствуют на сервере
-            foreach (var localTransaction in localTransactionsIdDict.Values)
+            // from local
+            foreach (Transaction localTransaction in 
+                localTransactionsIdDict.Values)
             {
+                // exists on api
                 if (apiTransactionsIdDict.ContainsKey(localTransaction.Id))
                     continue;
 
@@ -366,16 +352,17 @@ namespace HomeBudgetClient.Services
                     CreateTransactionRequest(localTransaction, syncTime));
 
                 localTransaction.SyncedAt = syncTime;
-                anyLocalChanges = true;
-                anyRemoteChanges = true;
+
+                localChanges = true;
+                apiChanges = true;
             }
 
-            if (!anyLocalChanges && !anyRemoteChanges)
+            if (!localChanges && !apiChanges)
                 return (SyncStatus.NothingToSync, null);
 
             try
             {
-                if (anyLocalChanges)
+                if (localChanges)
                     await _context.SaveChangesAsync();
 
                 return (SyncStatus.Synced, null);
@@ -387,155 +374,42 @@ namespace HomeBudgetClient.Services
             }
         }
 
-    //    private Transaction MapApiTransactionToLocal(
-    //DetailedTransactionResponse apiTransaction,
-    //DateTime syncTime)
-    //    {
-    //        var transaction = new Transaction
-    //        {
-    //            Id = apiTransaction.Id,
-    //            UserId = apiTransaction.UserId,
-    //            CategoryId = apiTransaction.CategoryId,
-    //            Type = apiTransaction.Type,
-    //            TotalAmount = apiTransaction.TotalAmount,
-    //            CurrencyId = apiTransaction.CurrencyId!.Value,
-    //            Comment = apiTransaction.Comment,
-    //            Date = apiTransaction.Date,
-    //            CreatedAt = apiTransaction.CreatedAt,
-    //            UpdatedAt = apiTransaction.UpdatedAt,
-    //            SyncedAt = syncTime,
-    //            IsConsidered = apiTransaction.IsConsidered,
-    //            IsDeleted = apiTransaction.IsDeleted,
-    //            Items = MapApiItems(apiTransaction.Items, apiTransaction.Id, syncTime)
-    //        };
-
-    //        return transaction;
-    //    }
-
-        //private void ApplyApiTransactionToLocal(
-        //    Transaction localTransaction,
-        //    DetailedTransactionResponse apiTransaction,
-        //    DateTime syncTime)
-        //{
-        //    localTransaction.UserId = apiTransaction.UserId;
-        //    localTransaction.CategoryId = apiTransaction.CategoryId;
-        //    localTransaction.Type = apiTransaction.Type;
-        //    localTransaction.TotalAmount = apiTransaction.TotalAmount;
-        //    localTransaction.CurrencyId = apiTransaction.CurrencyId!.Value;
-        //    localTransaction.Comment = apiTransaction.Comment;
-        //    localTransaction.Date = apiTransaction.Date;
-        //    localTransaction.CreatedAt = apiTransaction.CreatedAt;
-        //    localTransaction.UpdatedAt = apiTransaction.UpdatedAt;
-        //    localTransaction.SyncedAt = syncTime;
-        //    localTransaction.IsConsidered = apiTransaction.IsConsidered;
-        //    localTransaction.IsDeleted = apiTransaction.IsDeleted;
-
-        //    if (localTransaction.Items.Any())
-        //        _context.TransactionItems.RemoveRange(localTransaction.Items);
-
-        //    localTransaction.Items =
-        //        MapApiItems(apiTransaction.Items, localTransaction.Id, syncTime);
-        //}
-
-        //private List<TransactionItem> MapApiItems(
-        //    List<TransactionItemResponse>? apiItems,
-        //    Guid transactionId,
-        //    DateTime syncTime)
-        //{
-        //    if (apiItems is null || apiItems.Count == 0)
-        //        return new List<TransactionItem>();
-
-        //    return apiItems.Select(item => new TransactionItem
-        //    {
-        //        Id = item.Id,
-        //        TransactionId = transactionId,
-        //        Name = item.Name,
-        //        Quantity = item.Quantity,
-        //        UnitPrice = item.UnitPrice,
-        //        TotalPrice = item.TotalPrice,
-
-        //        // Если в DTO уже появились эти поля,
-        //        // просто замени на значения с сервера
-        //        CreatedAt = syncTime,
-        //        IsDeleted = false
-        //    }).ToList();
-        //}
-
-        private Transaction CreateTransaction(
-            DetailedTransactionResponse t,
-            DateTime syncTime)
-        {
-            Transaction res = new()
-            {
-                Id = t.Id,
-                UserId = t.UserId,
-                Type = t.Type,
-                Date = t.Date,
-                TotalAmount = t.TotalAmount,
-                CurrencyId = (Guid)t.CurrencyId!,
-                Comment = t.Comment,
-                CategoryId = t.CategoryId,
-                CreatedAt = t.CreatedAt,
-                UpdatedAt = t.UpdatedAt,
-                SyncedAt = syncTime,
-                IsDeleted = t.IsDeleted,
-                IsConsidered = t.IsConsidered,
-            };
-        }
-
-        private TransactionItem CreateTransactionItem(
-            TransactionItemResponse ti,
-            Guid tid)
-        {
-            return new TransactionItem
-            {
-                Id = ti.Id,
-                Name = ti.Name,
-                TransactionId = tid,
-                UnitPrice = ti.UnitPrice,
-                TotalPrice = ti.TotalPrice
-            }
-        }
+        
 
         private CreateTransactionRequest CreateTransactionRequest(
-            Transaction transaction,
+            Transaction t,
             DateTime syncTime)
         {
-            List<CreateTransactionItemRequest> transactionItemRequests = [];
+            List<CreateTransactionItemRequest> itemRequests = [];
 
-            foreach (TransactionItem transactionItem in transaction.Items)
+            if (t.Items.Count > 0)
             {
-                transactionItemRequests.Add(
-                    CreateTransactionItemRequest(transactionItem));
+                foreach (TransactionItem item in t.Items)
+                {
+                    itemRequests.Add(new CreateTransactionItemRequest
+                    {
+                        Id = item.Id,
+                        Name = item.Name,
+                        Quantity = item.Quantity,
+                        UnitPrice = item.UnitPrice,
+                        TotalPrice = item.TotalPrice
+                    });
+                }
             }
 
             return new CreateTransactionRequest
             {
-                Id = transaction.Id,
-                CategoryId = transaction.CategoryId,
-                Type = transaction.Type,
-                TotalAmount = transaction.TotalAmount,
-                CurrencyId = transaction.CurrencyId,
-                Comment = transaction.Comment,
-                Date = transaction.Date,
-                UpdatedAt = transaction.UpdatedAt,
+                Id = t.Id,
+                CurrencyId = t.CurrencyId,
+                CategoryId = t.CategoryId,
+                TotalAmount = t.TotalAmount,
+                Comment = t.Comment,
+                Date = t.Date,
+                UpdatedAt = t.UpdatedAt,
                 SyncedAt = syncTime,
-                IsConsidered = transaction.IsConsidered,
-                IsDeleted = transaction.IsDeleted,
-                Items = transactionItemRequests
-            };
-        }
-
-        private CreateTransactionItemRequest CreateTransactionItemRequest(
-            TransactionItem ti)
-        {
-            return new CreateTransactionItemRequest
-            {
-                Id = ti.Id,
-                Name = ti.Name,
-                Quantity = ti.Quantity,
-                UnitPrice = ti.UnitPrice,
-                TotalPrice = ti.TotalPrice
+                IsConsidered = t.IsConsidered,
+                IsDeleted = t.IsDeleted,
+                Items = itemRequests
             };
         }
 
@@ -553,15 +427,5 @@ namespace HomeBudgetClient.Services
                 IsDeleted = c.IsDeleted
             };
         }
-
-        //private async Task<User?> GetUser()
-        //{
-        //    Guid? userId = await _tokenStorage.GetUserIdAsync();
-
-        //    List<User> userList = [.. (await _context.GetFilteredAsync<User>(
-        //        u => u.Id == userId.Value))];
-
-        //    return userList.FirstOrDefault();
-        //}
     }
 }

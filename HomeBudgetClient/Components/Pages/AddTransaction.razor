@@ -1,0 +1,730 @@
+@page "/transactions/new"
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components
+@using Microsoft.EntityFrameworkCore
+@using HomeBudgetShared.Contracts
+@using HomeBudgetShared.Data
+@using HomeBudgetShared.Models
+@inject AppDbContext Db
+@inject NavigationManager NavigationManager
+
+<PageTitle>Новая транзакция</PageTitle>
+
+<div class="transaction-create-page">
+    <div class="transaction-create-shell">
+        <aside class="sidebar" aria-label="Основная навигация">
+            <div class="sidebar__brand card">
+                <h1 class="sidebar__brand__title">Home Budget</h1>
+                <p class="sidebar__brand__text">Добавление новой транзакции с понятной формой, позициями и быстрой проверкой данных.</p>
+            </div>
+
+            <nav class="sidebar__nav">
+                <a class="sidebar__nav__link" href="/">Главная</a>
+                <a class="sidebar__nav__link" href="/transactions">Транзакции</a>
+                <a class="sidebar__nav__link" href="/categories">Категории</a>
+                <a class="sidebar__nav__link" href="/analysis">Аналитика</a>
+                <a class="sidebar__nav__link" href="#">Настройки</a>
+            </nav>
+
+            <section class="sidebar__summary card">
+                <p class="card__label">Новая запись</p>
+                <p class="sidebar__summary__value">@(_form.Items.Count)</p>
+                <p class="sidebar__summary__text">Количество позиций в текущей форме. Итог можно ввести вручную или подставить из позиций.</p>
+            </section>
+        </aside>
+
+        <div class="workspace">
+            <header class="hero card">
+                <div class="hero__content">
+                    <span class="hero__badge">Новая транзакция</span>
+                    <h2 class="hero__title">Добавить доход или расход</h2>
+                    <p class="hero__text">Сначала выбери категорию, валюту и дату. Затем при необходимости добавь позиции. Если позиций несколько, сумма может подставляться из них.</p>
+                </div>
+
+                <div class="hero__actions">
+                    <button class="button button--primary" type="button" @onclick="SaveAsync" disabled="@_isBusy">Сохранить и перейти к журналу</button>
+                    <a class="button button--ghost" href="/transactions">К списку транзакций</a>
+                </div>
+            </header>
+
+            <section class="state-card card state-card--info state-card--steps" aria-label="Подсказка по работе с формой">
+                <div class="steps-grid">
+                    <div class="step-chip"><strong>1.</strong><span>Выбери категорию и валюту.</span></div>
+                    <div class="step-chip"><strong>2.</strong><span>Заполни сумму и дату.</span></div>
+                    <div class="step-chip"><strong>3.</strong><span>При необходимости добавь позиции.</span></div>
+                    <div class="step-chip"><strong>4.</strong><span>Нажми большую кнопку сохранения.</span></div>
+                </div>
+            </section>
+
+            @if (_isLoading)
+            {
+                <section class="state-card card" aria-live="polite">
+                    <p class="state-card__title">Загрузка формы…</p>
+                    <p class="state-card__text">Получаем валюты, категории и подготавливаем форму для новой записи.</p>
+                </section>
+            }
+            else
+            {
+                @if (!string.IsNullOrWhiteSpace(_loadError))
+                {
+                    <section class="state-card card state-card--error" aria-live="assertive">
+                        <p class="state-card__title">Не удалось подготовить форму</p>
+                        <p class="state-card__text">@_loadError</p>
+                    </section>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_diagnosticText))
+                {
+                    <section class="state-card card state-card--info" aria-live="polite">
+                        <p class="state-card__title">Диагностика</p>
+                        <p class="state-card__text">@_diagnosticText</p>
+                    </section>
+                }
+
+                @if (_validationMessages.Count > 0)
+                {
+                    <section class="state-card card state-card--error" aria-live="assertive">
+                        <p class="state-card__title">Проверь форму</p>
+                        <ul class="state-card__list">
+                            @foreach (var message in _validationMessages)
+                            {
+                                <li>@message</li>
+                            }
+                        </ul>
+                    </section>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_successMessage))
+                {
+                    <section class="state-card card state-card--success" aria-live="polite">
+                        <p class="state-card__title">Транзакция сохранена</p>
+                        <p class="state-card__text">@_successMessage</p>
+                    </section>
+                }
+
+                <div class="editor-grid">
+                    <section class="editor-main">
+                        <article class="form-card card form-card--primary">
+                            <header class="section-heading">
+                                <div>
+                                    <p class="card__label">Основная информация</p>
+                                    <h3 class="section-heading__title">Основные данные</h3>
+                                </div>
+                                <span class="type-pill @SelectedTypeBadgeClass">@SelectedTypeLabel</span>
+                            </header>
+
+                            <div class="form-grid">
+                                <label class="field">
+                                    <span class="field__label">Категория</span>
+                                    <InputSelect class="field__input field__input--select" @bind-Value="_form.CategoryId">
+                                        <option value="">Выбери категорию</option>
+                                        @if (ExpenseCategories.Count > 0)
+                                        {
+                                            <optgroup label="Расходы">
+                                                @foreach (var category in ExpenseCategories)
+                                                {
+                                                    <option value="@category.Id">@category.Name</option>
+                                                }
+                                            </optgroup>
+                                        }
+                                        @if (IncomeCategories.Count > 0)
+                                        {
+                                            <optgroup label="Доходы">
+                                                @foreach (var category in IncomeCategories)
+                                                {
+                                                    <option value="@category.Id">@category.Name</option>
+                                                }
+                                            </optgroup>
+                                        }
+                                        @if (OtherCategories.Count > 0)
+                                        {
+                                            <optgroup label="Прочее">
+                                                @foreach (var category in OtherCategories)
+                                                {
+                                                    <option value="@category.Id">@category.Name</option>
+                                                }
+                                            </optgroup>
+                                        }
+                                    </InputSelect>
+                                </label>
+
+                                <label class="field">
+                                    <span class="field__label">Валюта</span>
+                                    <InputSelect class="field__input field__input--select" @bind-Value="_form.CurrencyId">
+                                        <option value="">Выбери валюту</option>
+                                        @foreach (var currency in _currencies)
+                                        {
+                                            <option value="@currency.Id">@currency.Code — @currency.Name (@currency.Symbol)</option>
+                                        }
+                                    </InputSelect>
+                                </label>
+
+                                <label class="field">
+                                    <span class="field__label">Дата</span>
+                                    <InputDate class="field__input" @bind-Value="_form.Date" />
+                                </label>
+
+                                <label class="field">
+                                    <span class="field__label">Итоговая сумма</span>
+                                    <InputNumber class="field__input" @bind-Value="_form.TotalAmount" step="0.01" />
+                                </label>
+                            </div>
+
+                            <div class="toggle-row">
+                                <label class="toggle-card">
+                                    <InputCheckbox class="toggle-card__input" @bind-Value="_form.IsConsidered" />
+                                    <span class="toggle-card__text">
+                                        <strong>Учитывать в статистике</strong>
+                                        <small>Если выключить, транзакция сохранится в журнале, но не попадёт в диаграммы и месячные итоги.</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </article>
+
+                        <article class="form-card card form-card--comment">
+                            <header class="section-heading section-heading--compact">
+                                <div>
+                                    <p class="card__label">Комментарий</p>
+                                    <h3 class="section-heading__title">Заметка к операции</h3>
+                                </div>
+                            </header>
+
+                            <label class="field">
+                                <span class="field__label">Комментарий</span>
+                                <InputTextArea class="field__textarea" @bind-Value="_form.Comment" />
+                            </label>
+                        </article>
+
+                        <article class="form-card card form-card--items">
+                            <header class="section-heading">
+                                <div>
+                                    <p class="card__label">Позиции</p>
+                                    <h3 class="section-heading__title">Состав транзакции</h3>
+                                </div>
+
+                                <div class="section-heading__actions">
+                                    <button class="button button--ghost" type="button" @onclick="AddItem">Добавить позицию</button>
+                                    <button class="button button--secondary" type="button" @onclick="ApplyItemsTotal" disabled="@(ComputedItemsTotal <= 0m)">Подставить сумму из позиций</button>
+                                </div>
+                            </header>
+
+                            @if (_form.Items.Count == 0)
+                            {
+                                <p class="empty-text">Позиции необязательны. Можно сохранить только общую сумму, а можно добавить подробный состав.</p>
+                            }
+                            else
+                            {
+                                <div class="items-stack">
+                                    @for (var index = 0; index < _form.Items.Count; index++)
+                                    {
+                                        var item = _form.Items[index];
+                                        var currentIndex = index;
+                                        <article class="item-card" @key="item.Id">
+                                            <div class="item-card__header">
+                                                <div>
+                                                    <p class="card__label">Позиция @(index + 1)</p>
+                                                    <h4 class="item-card__title">@(string.IsNullOrWhiteSpace(item.Name) ? "Новая позиция" : item.Name)</h4>
+                                                </div>
+                                                <button class="button button--danger" type="button" @onclick="() => RemoveItem(currentIndex)">Удалить</button>
+                                            </div>
+
+                                            <div class="form-grid form-grid--items">
+                                                <label class="field field--wide">
+                                                    <span class="field__label">Название</span>
+                                                    <InputText class="field__input" @bind-Value="item.Name" />
+                                                </label>
+
+                                                <label class="field">
+                                                    <span class="field__label">Количество</span>
+                                                    <InputNumber class="field__input" @bind-Value="item.Quantity" @bind-Value:after="() => RecalculateFromUnitPrice(item)" />
+                                                </label>
+
+                                                <label class="field">
+                                                    <span class="field__label">Цена за единицу</span>
+                                                    <InputNumber class="field__input" @bind-Value="item.UnitPrice" step="0.01" @bind-Value:after="() => RecalculateFromUnitPrice(item)" />
+                                                </label>
+
+                                                <label class="field">
+                                                    <span class="field__label">Итог по позиции</span>
+                                                    <InputNumber class="field__input" @bind-Value="item.TotalPrice" step="0.01" @bind-Value:after="() => RecalculateFromTotalPrice(item)" />
+                                                </label>
+                                            </div>
+                                        </article>
+                                    }
+                                </div>
+                            }
+                        </article>
+                    </section>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "userId")]
+    public Guid? UserId { get; set; }
+
+    private readonly TransactionFormModel _form = new();
+    private readonly List<string> _validationMessages = [];
+    private List<CategoryOptionVm> _categories = [];
+    private List<CurrencyOptionVm> _currencies = [];
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private string? _successMessage;
+    private string? _diagnosticText;
+    private Guid? _resolvedUserId;
+    private Guid? _defaultCurrencyId;
+
+    private decimal ComputedItemsTotal => Math.Round(_form.Items
+        .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+        .Sum(item => item.TotalPrice ?? ((item.UnitPrice ?? 0m) * Math.Max(1, item.Quantity))), 2, MidpointRounding.AwayFromZero);
+
+    private string SelectedTypeLabel => _categories.FirstOrDefault(category => category.Id == _form.CategoryId)?.TypeLabel ?? "Категория не выбрана";
+    private string SelectedTypeBadgeClass => _categories.FirstOrDefault(category => category.Id == _form.CategoryId)?.Type == "expense"
+        ? "type-pill--expense"
+        : _categories.FirstOrDefault(category => category.Id == _form.CategoryId)?.Type == "income"
+            ? "type-pill--income"
+            : "type-pill--neutral";
+    private string SelectedCategoryName => _categories.FirstOrDefault(category => category.Id == _form.CategoryId)?.Name ?? "—";
+    private string SelectedCurrencyLabel => _currencies.FirstOrDefault(currency => currency.Id == _form.CurrencyId)?.DisplayLabel ?? "—";
+    private string SelectedCurrencySymbol => _currencies.FirstOrDefault(currency => currency.Id == _form.CurrencyId)?.Symbol ?? "₽";
+    private List<CategoryOptionVm> ExpenseCategories => _categories.Where(category => category.TypeNormalized == "expense").ToList();
+    private List<CategoryOptionVm> IncomeCategories => _categories.Where(category => category.TypeNormalized == "income").ToList();
+    private List<CategoryOptionVm> OtherCategories => _categories.Where(category => category.TypeNormalized is not ("expense" or "income")).ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        _successMessage = null;
+        _diagnosticText = null;
+        _validationMessages.Clear();
+
+        try
+        {
+            _resolvedUserId = await ResolveUserIdAsync();
+
+            IQueryable<Category> categoriesQuery = Db.Categories
+                .AsNoTracking()
+                .Where(category => !category.IsDeleted);
+
+            var allActiveCategories = await categoriesQuery
+                .Select(category => new CategoryOptionVm
+                {
+                    Id = category.Id,
+                    Name = category.Name,
+                    Type = category.Type,
+                    TypeNormalized = NormalizeCategoryType(category.Type)
+                })
+                .ToListAsync();
+
+            if (_resolvedUserId.HasValue)
+            {
+                var allowedCategoryIds = await Db.Categories
+                    .AsNoTracking()
+                    .Where(category => !category.IsDeleted && category.UserId == _resolvedUserId.Value)
+                    .Select(category => category.Id)
+                    .ToListAsync();
+
+                _categories = allActiveCategories
+                    .Where(category => allowedCategoryIds.Contains(category.Id))
+                    .ToList();
+
+                if (_categories.Count <= 1 && UserId is null && allActiveCategories.Count > _categories.Count)
+                {
+                    _categories = allActiveCategories;
+                    _diagnosticText = "Категории показаны полностью: пользовательский фильтр вернул слишком мало записей.";
+                }
+            }
+            else
+            {
+                _categories = allActiveCategories;
+            }
+
+            _categories = _categories
+                .OrderBy(category => category.TypeNormalized)
+                .ThenBy(category => category.Name)
+                .Select(category =>
+                {
+                    category.TypeLabel = category.TypeNormalized switch
+                    {
+                        "expense" => "Расход",
+                        "income" => "Доход",
+                        _ => "Категория"
+                    };
+                    return category;
+                })
+                .ToList();
+
+            _currencies = await Db.Currencies
+                .AsNoTracking()
+                .OrderBy(currency => currency.Code)
+                .Select(currency => new CurrencyOptionVm
+                {
+                    Id = currency.Id,
+                    Code = currency.Code,
+                    Name = currency.Name,
+                    Symbol = currency.Symbol
+                })
+                .ToListAsync();
+
+            if (_resolvedUserId.HasValue)
+            {
+                _defaultCurrencyId = await Db.Users
+                    .AsNoTracking()
+                    .Where(user => user.Id == _resolvedUserId.Value)
+                    .Select(user => (Guid?)user.CurrencyId)
+                    .FirstOrDefaultAsync();
+            }
+
+            ResetForm();
+
+            var diagnostics = new List<string>
+            {
+                $"Категорий: {_categories.Count}.",
+                $"Валют: {_currencies.Count}."
+            };
+
+            if (_resolvedUserId.HasValue)
+            {
+                diagnostics.Add($"Пользователь определён: {_resolvedUserId.Value}."
+                );
+            }
+            else
+            {
+                diagnostics.Add("Пользователь автоматически не определён. Для сохранения укажи userId в адресе или оставь в БД одного пользователя.");
+            }
+
+            _diagnosticText = string.Join(" ", diagnostics.Concat(string.IsNullOrWhiteSpace(_diagnosticText) ? [] : new[] { _diagnosticText }));
+        }
+        catch (Exception exception)
+        {
+            _loadError = exception.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task<Guid?> ResolveUserIdAsync()
+    {
+        if (UserId.HasValue && UserId.Value != Guid.Empty)
+        {
+            var requestedExists = await Db.Users.AsNoTracking().AnyAsync(user => user.Id == UserId.Value);
+            if (requestedExists)
+            {
+                return UserId.Value;
+            }
+        }
+
+        var userIds = await Db.Users
+            .AsNoTracking()
+            .Select(user => user.Id)
+            .ToListAsync();
+
+        return userIds.Count == 1 ? userIds[0] : null;
+    }
+
+    private void AddItem()
+    {
+        _form.Items.Add(new TransactionItemFormModel());
+    }
+
+    private void RemoveItem(int index)
+    {
+        if (index >= 0 && index < _form.Items.Count)
+        {
+            _form.Items.RemoveAt(index);
+        }
+    }
+
+    private void ApplyItemsTotal()
+    {
+        if (ComputedItemsTotal > 0m)
+        {
+            _form.TotalAmount = ComputedItemsTotal;
+        }
+    }
+
+    private void RecalculateFromUnitPrice(TransactionItemFormModel item)
+    {
+        if (item.Quantity <= 0)
+        {
+            item.Quantity = 1;
+        }
+
+        if (item.UnitPrice.HasValue)
+        {
+            item.TotalPrice = Math.Round(item.UnitPrice.Value * item.Quantity, 2, MidpointRounding.AwayFromZero);
+        }
+    }
+
+    private void RecalculateFromTotalPrice(TransactionItemFormModel item)
+    {
+        if (item.Quantity <= 0)
+        {
+            item.Quantity = 1;
+        }
+
+        if (item.TotalPrice.HasValue)
+        {
+            item.UnitPrice = Math.Round(item.TotalPrice.Value / item.Quantity, 2, MidpointRounding.AwayFromZero);
+        }
+    }
+
+    private void ResetForm()
+    {
+        _form.CurrencyId = _defaultCurrencyId ?? _currencies.FirstOrDefault()?.Id;
+        _form.CategoryId = _categories.FirstOrDefault()?.Id;
+        _form.TotalAmount = 0m;
+        _form.Comment = string.Empty;
+        _form.Date = DateTime.Today;
+        _form.IsConsidered = true;
+        _form.Items.Clear();
+        _form.Items.Add(new TransactionItemFormModel());
+        _validationMessages.Clear();
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        _successMessage = null;
+        _validationMessages.Clear();
+
+        try
+        {
+            if (!_resolvedUserId.HasValue)
+            {
+                _validationMessages.Add("Не удалось определить пользователя. Открой страницу с параметром ?userId=<GUID> или оставь в базе одного пользователя.");
+                return;
+            }
+
+            ValidateForm();
+            if (_validationMessages.Count > 0)
+            {
+                return;
+            }
+
+            var request = BuildRequest();
+            var transactionId = request.Id == Guid.Empty ? Guid.NewGuid() : request.Id;
+
+            var transaction = new Transaction
+            {
+                Id = transactionId,
+                UserId = _resolvedUserId.Value,
+                CurrencyId = request.CurrencyId!.Value,
+                CategoryId = request.CategoryId,
+                TotalAmount = request.TotalAmount,
+                Comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim(),
+                Date = request.Date,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                SyncedAt = request.SyncedAt,
+                IsConsidered = request.IsConsidered,
+                IsDeleted = false,
+                Items = new List<TransactionItem>()
+            };
+
+            foreach (var itemRequest in request.Items ?? [])
+            {
+                var item = new TransactionItem
+                {
+                    Id = itemRequest.Id == Guid.Empty ? Guid.NewGuid() : itemRequest.Id,
+                    TransactionId = transaction.Id,
+                    Name = itemRequest.Name.Trim(),
+                    Quantity = itemRequest.Quantity <= 0 ? 1 : itemRequest.Quantity,
+                    UnitPrice = itemRequest.UnitPrice,
+                    TotalPrice = itemRequest.TotalPrice
+                };
+
+                var itemValidation = item.Validate();
+                if (!itemValidation.IsValid)
+                {
+                    _validationMessages.Add(itemValidation.ErrorMessage ?? "Одна из позиций заполнена неверно.");
+                    return;
+                }
+
+                transaction.Items.Add(item);
+            }
+
+            if (transaction.Items.Count > 0)
+            {
+                var itemsTotal = transaction.Items.Sum(item => item.TotalPrice ?? 0m);
+                if (itemsTotal > 0m)
+                {
+                    transaction.TotalAmount = itemsTotal;
+                }
+            }
+
+            var transactionValidation = transaction.Validate();
+            if (!transactionValidation.IsValid)
+            {
+                _validationMessages.Add(transactionValidation.ErrorMessage ?? "Транзакция заполнена неверно.");
+                return;
+            }
+
+            await Db.Transactions.AddAsync(transaction);
+            await Db.SaveChangesAsync();
+
+            _successMessage = $"Транзакция успешно сохранена. Идентификатор: {transaction.Id}.";
+            NavigationManager.NavigateTo("/transactions");
+        }
+        catch (Exception exception)
+        {
+            _validationMessages.Add($"Ошибка сохранения: {exception.Message}");
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private void ValidateForm()
+    {
+        if (!_form.CategoryId.HasValue || _form.CategoryId == Guid.Empty)
+        {
+            _validationMessages.Add("Выбери категорию.");
+        }
+
+        if (!_form.CurrencyId.HasValue || _form.CurrencyId == Guid.Empty)
+        {
+            _validationMessages.Add("Выбери валюту.");
+        }
+
+        if (_form.Date == default)
+        {
+            _validationMessages.Add("Укажи корректную дату.");
+        }
+
+        var visibleItems = _form.Items
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .ToList();
+
+        if (visibleItems.Count == 0 && _form.TotalAmount <= 0m)
+        {
+            _validationMessages.Add("Укажи сумму больше нуля или заполни позиции транзакции.");
+        }
+
+        foreach (var item in visibleItems)
+        {
+            if (item.Quantity <= 0)
+            {
+                _validationMessages.Add($"Позиция \"{item.Name}\" должна иметь количество больше нуля.");
+            }
+
+            var hasUnit = item.UnitPrice.HasValue;
+            var hasTotal = item.TotalPrice.HasValue;
+            if (!hasUnit && !hasTotal)
+            {
+                _validationMessages.Add($"Для позиции \"{item.Name}\" укажи цену за единицу или итоговую сумму.");
+            }
+        }
+    }
+
+    private CreateTransactionRequest BuildRequest()
+    {
+        var itemRequests = _form.Items
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .Select(item => new CreateTransactionItemRequest
+            {
+                Id = item.Id,
+                Name = item.Name.Trim(),
+                Quantity = item.Quantity <= 0 ? 1 : item.Quantity,
+                UnitPrice = item.UnitPrice,
+                TotalPrice = item.TotalPrice
+            })
+            .ToList();
+
+        var total = _form.TotalAmount;
+        if (itemRequests.Count > 0)
+        {
+            var itemsTotal = itemRequests.Sum(item => item.TotalPrice ?? ((item.UnitPrice ?? 0m) * item.Quantity));
+            if (itemsTotal > 0m)
+            {
+                total = itemsTotal;
+            }
+        }
+
+        return new CreateTransactionRequest
+        {
+            Id = Guid.NewGuid(),
+            CurrencyId = _form.CurrencyId,
+            CategoryId = _form.CategoryId,
+            TotalAmount = Math.Abs(total),
+            Comment = string.IsNullOrWhiteSpace(_form.Comment) ? null : _form.Comment.Trim(),
+            Date = _form.Date,
+            UpdatedAt = DateTime.UtcNow,
+            SyncedAt = null,
+            IsConsidered = _form.IsConsidered,
+            IsDeleted = false,
+            Items = itemRequests
+        };
+    }
+
+    private static string NormalizeCategoryType(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "expense" or "расход" => "expense",
+            "income" or "доход" => "income",
+            _ => normalized ?? string.Empty
+        };
+    }
+
+    private static string FormatMoney(decimal value, string symbol)
+    {
+        return $"{value:N2} {symbol}";
+    }
+
+    private sealed class TransactionFormModel
+    {
+        public Guid? CurrencyId { get; set; }
+        public Guid? CategoryId { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string? Comment { get; set; }
+        public DateTime Date { get; set; } = DateTime.Today;
+        public bool IsConsidered { get; set; } = true;
+        public List<TransactionItemFormModel> Items { get; } = [];
+    }
+
+    private sealed class TransactionItemFormModel
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Name { get; set; } = string.Empty;
+        public int Quantity { get; set; } = 1;
+        public decimal? UnitPrice { get; set; }
+        public decimal? TotalPrice { get; set; }
+    }
+
+    private sealed class CategoryOptionVm
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string TypeNormalized { get; set; } = string.Empty;
+        public string TypeLabel { get; set; } = string.Empty;
+    }
+
+    private sealed class CurrencyOptionVm
+    {
+        public Guid Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Symbol { get; set; } = string.Empty;
+        public string DisplayLabel => $"{Code} — {Name} ({Symbol})";
+    }
+}

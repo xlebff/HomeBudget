@@ -1,0 +1,93 @@
+:root,
+:root[data-theme="dark"],
+.theme-dark {
+    --bg-color: #181224;
+    --bg-glow: rgba(139, 92, 246, 0.2);
+    --surface-color: rgba(34, 25, 50, 0.78);
+    --surface-color-strong: rgba(28, 20, 43, 0.94);
+    --border-color: rgba(167, 139, 250, 0.16);
+    --border-strong: rgba(167, 139, 250, 0.28);
+    --shadow-color: rgba(7, 4, 15, 0.45);
+
+    --text-primary: #f5f3ff;
+    --text-secondary: #c4bddf;
+    --text-muted: #9d93bb;
+
+    --primary-color: #8b5cf6;
+    --primary-color-strong: #6d3fe6;
+    --primary-color-soft: rgba(139, 92, 246, 0.14);
+    --primary-lavender: #ddd6fe;
+
+    --success-color: #34d399;
+    --warning-color: #fb7185;
+
+    --income-1: #8b5cf6;
+    --income-2: #a78bfa;
+    --income-3: #c084fc;
+    --income-4: #67e8f9;
+    --income-5: #22d3ee;
+    --income-6: #38bdf8;
+    --income-7: #818cf8;
+    --income-8: #d8b4fe;
+
+    --expense-1: #fb7185;
+    --expense-2: #f59e0b;
+    --expense-3: #f97316;
+    --expense-4: #ef4444;
+    --expense-5: #f43f5e;
+    --expense-6: #fda4af;
+    --expense-7: #fdba74;
+    --expense-8: #fecdd3;
+}
+
+:root[data-theme="light"],
+.theme-light {
+    --bg-color: #f7fbff;
+    --bg-glow: rgba(56, 189, 248, 0.18);
+    --surface-color: rgba(255, 255, 255, 0.92);
+    --surface-color-strong: rgba(255, 255, 255, 0.98);
+    --border-color: rgba(56, 189, 248, 0.16);
+    --border-strong: rgba(56, 189, 248, 0.28);
+    --shadow-color: rgba(35, 71, 102, 0.14);
+
+    --text-primary: #10233a;
+    --text-secondary: #486279;
+    --text-muted: #6d8599;
+
+    --primary-color: #38bdf8;
+    --primary-color-strong: #0ea5e9;
+    --primary-color-soft: rgba(56, 189, 248, 0.14);
+    --primary-lavender: #0f3b5f;
+
+    --success-color: #0f9f6e;
+    --warning-color: #dc4c64;
+
+    --income-1: #0ea5e9;
+    --income-2: #38bdf8;
+    --income-3: #7dd3fc;
+    --income-4: #22d3ee;
+    --income-5: #06b6d4;
+    --income-6: #60a5fa;
+    --income-7: #93c5fd;
+    --income-8: #bae6fd;
+
+    --expense-1: #fb7185;
+    --expense-2: #f59e0b;
+    --expense-3: #f97316;
+    --expense-4: #ef4444;
+    --expense-5: #e879f9;
+    --expense-6: #fda4af;
+    --expense-7: #fdba74;
+    --expense-8: #fecdd3;
+}
+
+
+:root,
+:root[data-theme="dark"],
+.theme-dark,
+:root[data-theme="light"],
+.theme-light {
+    --radius-card: 1.5rem;
+    --radius-control: 1rem;
+    --radius-pill: 999rem;
+}

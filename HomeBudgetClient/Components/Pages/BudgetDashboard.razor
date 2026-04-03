@@ -1,0 +1,341 @@
+@page "/"
+@using System.Globalization
+@inject IBudgetDashboardDataService DashboardDataService
+
+<PageTitle>Home Budget</PageTitle>
+
+<div class="dashboard-page">
+    <div class="dashboard-shell">
+        <aside class="sidebar">
+            <div class="sidebar__brand card-block">
+                <h1 class="sidebar__brand__title">@_pageData.AppTitle</h1>
+                <p class="sidebar__brand__text">@_pageData.AppDescription</p>
+            </div>
+
+            <nav class="sidebar__nav" aria-label="Основная навигация">
+                <a class="sidebar__nav__link sidebar__nav__link_active" href="/">Главная</a>
+                <a class="sidebar__nav__link" href="/transactions">Транзакции</a>
+                <a class="sidebar__nav__link" href="/categories">Категории</a>
+                <a class="sidebar__nav__link" href="/analysis">Аналитика</a>
+                <a class="sidebar__nav__link" href="/settings">Настройки</a>
+            </nav>
+
+            <section class="sidebar__summary card-block">
+                <p class="card-label">@_pageData.SidebarSummaryTitle</p>
+                <p class="sidebar__summary__value @GetMetricAccentClass(_pageData.BalanceMetric)">@FormatMoney(_pageData.BalanceMetric.Value, _pageData.CurrencySymbol)</p>
+                <p class="sidebar__summary__text">@_pageData.SidebarSummaryHint</p>
+            </section>
+        </aside>
+
+        <div class="dashboard-content">
+            <header class="hero card-panel">
+                <div class="hero__content">
+                    <span class="hero__badge">@_pageData.HeroBadge</span>
+                    <h2 class="hero__title">@_pageData.HeroTitle</h2>
+                    <p class="hero__text">@_pageData.HeroDescription</p>
+                </div>
+
+                <div class="hero__actions">
+                    <a class="button button--primary" href="/transactions/new">Добавить транзакцию</a>
+                    <a class="button button--secondary" href="/transactions">Все транзакции</a>
+                </div>
+            </header>
+
+            @if (_isLoading)
+            {
+                <section class="state-card card-panel">
+                    <h3 class="state-card__title">Загрузка данных…</h3>
+                    <p class="state-card__text">Страница получает сведения из БД и собирает аналитические блоки.</p>
+                </section>
+            }
+            else if (!string.IsNullOrWhiteSpace(_loadError))
+            {
+                <section class="state-card state-card--error card-panel">
+                    <h3 class="state-card__title">Не удалось загрузить данные</h3>
+                    <p class="state-card__text">@_loadError</p>
+                </section>
+            }
+            else
+            {
+                <section class="metrics-grid" aria-label="Ключевые показатели">
+                    @foreach (var metric in _metrics)
+                    {
+                        <article class="metric-card card-panel">
+                            <p class="card-label">@metric.Label</p>
+                            <p class="metric-card__value @GetMetricAccentClass(metric)">@FormatMoney(metric.Value, _pageData.CurrencySymbol)</p>
+                            <p class="metric-card__note">@metric.Note</p>
+                        </article>
+                    }
+                </section>
+
+                @if (!string.IsNullOrWhiteSpace(_pageData.DiagnosticText))
+                {
+                    <section class="diagnostic-panel card-panel">
+                        <p class="card-label">Диагностика</p>
+                        <p class="diagnostic-panel__text">@_pageData.DiagnosticText</p>
+                    </section>
+                }
+
+                <div class="content-grid">
+                    <section class="charts-stack" aria-label="Диаграммы доходов и расходов">
+                        @ChartCard(_pageData.IncomeChart)
+                        @ChartCard(_pageData.ExpenseChart)
+                    </section>
+
+                    <aside class="side-stack">
+                        <article class="transaction-card card-panel">
+                            <div class="panel-heading">
+                                <div>
+                                    <p class="card-label">Текущая активность</p>
+                                    <h3 class="panel-heading__title">@_pageData.LastTransaction.Title</h3>
+                                </div>
+                            </div>
+
+                            @if (_pageData.LastTransaction.HasData)
+                            {
+                                <dl class="details-grid">
+                                    <div class="details-item">
+                                        <dt>Категория</dt>
+                                        <dd>@_pageData.LastTransaction.Category</dd>
+                                    </div>
+                                    <div class="details-item">
+                                        <dt>Тип</dt>
+                                        <dd>@_pageData.LastTransaction.TypeLabel</dd>
+                                    </div>
+                                    <div class="details-item">
+                                        <dt>Сумма</dt>
+                                        <dd>@FormatMoney(_pageData.LastTransaction.TotalAmount, _pageData.LastTransaction.CurrencySymbol)</dd>
+                                    </div>
+                                    <div class="details-item">
+                                        <dt>Дата</dt>
+                                        <dd>@FormatDate(_pageData.LastTransaction.Date)</dd>
+                                    </div>
+                                    <div class="details-item details-item--wide">
+                                        <dt>Комментарий</dt>
+                                        <dd>@_pageData.LastTransaction.Comment</dd>
+                                    </div>
+                                </dl>
+
+                                <section class="line-items">
+                                    <div class="line-items__header">
+                                        <span>Позиции</span>
+                                        <span>Сумма</span>
+                                    </div>
+
+                                    @if (_pageData.LastTransaction.Lines.Count == 0)
+                                    {
+                                        <p class="empty-text">У этой транзакции нет видимых позиций.</p>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var line in _pageData.LastTransaction.Lines)
+                                        {
+                                            <div class="line-item">
+                                                <div class="line-item__info">
+                                                    <strong>@line.Title</strong>
+                                                    @if (!string.IsNullOrWhiteSpace(line.Subtitle))
+                                                    {
+                                                        <span>@line.Subtitle</span>
+                                                    }
+                                                </div>
+                                                <strong class="line-item__amount">@FormatMoney(line.Amount, _pageData.LastTransaction.CurrencySymbol)</strong>
+                                            </div>
+                                        }
+                                    }
+                                </section>
+                            }
+                            else
+                            {
+                                <p class="empty-text">@_pageData.LastTransaction.Comment</p>
+                            }
+                        </article>
+                    </aside>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly CultureInfo RuCulture = CultureInfo.GetCultureInfo("ru-RU");
+    private readonly IReadOnlyList<string> _incomeColors =
+    [
+        "var(--button-color)",
+        "var(--border-accent-color)",
+        "var(--text-accent-color)",
+        "var(--field-color)",
+        "var(--border-color)"
+    ];
+
+    private readonly IReadOnlyList<string> _expenseColors =
+    [
+        "var(--button-accent-color)",
+        "var(--border-accent-color)",
+        "var(--button-color)",
+        "var(--field-color)",
+        "var(--border-color)"
+    ];
+
+    private DashboardPageData _pageData = DashboardPageData.CreateEmpty(DateTime.Today);
+    private bool _isLoading = true;
+    private string? _loadError;
+
+    private IReadOnlyList<SummaryMetricVm> _metrics =>
+    [
+        _pageData.BalanceMetric,
+        _pageData.IncomeMetric,
+        _pageData.ExpenseMetric
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            _pageData = await DashboardDataService.GetDashboardPageDataAsync(DateTime.Today);
+            NormalizeData(_pageData);
+        }
+        catch (Exception exception)
+        {
+            _pageData = DashboardPageData.CreateEmpty(DateTime.Today);
+            _loadError = exception.Message;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static void NormalizeData(DashboardPageData pageData)
+    {
+        pageData.BalanceMetric ??= new SummaryMetricVm { Label = "Общий баланс" };
+        pageData.IncomeMetric ??= new SummaryMetricVm { Label = "Доходы", Accent = MetricAccent.Positive };
+        pageData.ExpenseMetric ??= new SummaryMetricVm { Label = "Расходы", Accent = MetricAccent.Negative };
+        pageData.IncomeChart ??= ChartVm.CreateIncome();
+        pageData.ExpenseChart ??= ChartVm.CreateExpense();
+        pageData.LastTransaction ??= LastTransactionVm.CreateEmpty();
+        pageData.LastTransaction.Lines ??= new List<TransactionLineVm>();
+        pageData.IncomeChart.Slices ??= new List<ChartSliceVm>();
+        pageData.ExpenseChart.Slices ??= new List<ChartSliceVm>();
+        pageData.CurrencySymbol = string.IsNullOrWhiteSpace(pageData.CurrencySymbol) ? "₽" : pageData.CurrencySymbol;
+        pageData.CurrencyCode = string.IsNullOrWhiteSpace(pageData.CurrencyCode) ? "RUB" : pageData.CurrencyCode;
+    }
+
+    private RenderFragment ChartCard(ChartVm chart) => @<article class="chart-card card-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="card-label">@chart.Label</p>
+                <h3 class="panel-heading__title">@chart.Title</h3>
+            </div>
+        </div>
+
+        @if (chart.Slices.Count == 0 || chart.TotalAmount <= 0m)
+        {
+            <p class="empty-text">@chart.EmptyStateText</p>
+        }
+        else
+        {
+            var segments = BuildSegments(chart);
+            <div class="chart-layout">
+                <div class="chart-visual" aria-hidden="true">
+                    <svg class="chart-ring" viewBox="0 0 120 120" role="img">
+                        <circle class="chart-ring__track" cx="60" cy="60" r="42"></circle>
+                        @foreach (var segment in segments)
+                        {
+                            <circle class="chart-ring__segment"
+                                    cx="60"
+                                    cy="60"
+                                    r="42"
+                                    stroke="@segment.Color"
+                                    stroke-dasharray="@segment.DashArray"
+                                    stroke-dashoffset="@segment.DashOffset"></circle>
+                        }
+                    </svg>
+                    <div class="chart-total">
+                        <span class="chart-total__label">Итого</span>
+                        <strong>@FormatMoney(chart.TotalAmount, chart.CurrencySymbol)</strong>
+                    </div>
+                </div>
+
+                <ul class="chart-legend">
+                    @for (var index = 0; index < chart.Slices.Count; index++)
+                    {
+                        var slice = chart.Slices[index];
+                        var percent = chart.TotalAmount <= 0m ? 0m : Math.Round(slice.Amount / chart.TotalAmount * 100m, 1);
+                        var color = ResolveChartColor(chart.Kind, index);
+                        <li class="legend-item">
+                            <span class="legend-item__dot" style="background:@color;"></span>
+                            <div class="legend-item__content">
+                                <div class="legend-item__row">
+                                    <span>@slice.Name</span>
+                                    <strong>@FormatMoney(slice.Amount, chart.CurrencySymbol)</strong>
+                                </div>
+                                <div class="legend-item__bar">
+                                    <span style="width:@($"{percent.ToString(CultureInfo.InvariantCulture)}%"); background:@color;"></span>
+                                </div>
+                                <span class="legend-item__meta">@percent.ToString("0.0", CultureInfo.InvariantCulture)%</span>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </article>;
+
+    private List<ChartSegment> BuildSegments(ChartVm chart)
+    {
+        const double radius = 42d;
+        var circumference = 2d * Math.PI * radius;
+        var result = new List<ChartSegment>();
+        double offset = circumference * 0.25d;
+
+        for (var index = 0; index < chart.Slices.Count; index++)
+        {
+            var slice = chart.Slices[index];
+            var fraction = chart.TotalAmount <= 0m ? 0d : (double)(slice.Amount / chart.TotalAmount);
+            var length = circumference * fraction;
+            result.Add(new ChartSegment(
+                ResolveChartColor(chart.Kind, index),
+                $"{length.ToString(CultureInfo.InvariantCulture)} {(circumference - length).ToString(CultureInfo.InvariantCulture)}",
+                offset.ToString(CultureInfo.InvariantCulture)));
+            offset -= length;
+        }
+
+        return result;
+    }
+
+    private string ResolveChartColor(ChartKind kind, int index)
+    {
+        var palette = kind == ChartKind.Income ? _incomeColors : _expenseColors;
+        return palette[index % palette.Count];
+    }
+
+    private static string FormatMoney(decimal value, string currencySymbol)
+    {
+        return $"{value:N0} {currencySymbol}";
+    }
+
+    private static string FormatDate(DateTime? value)
+    {
+        return value.HasValue ? value.Value.ToString("dd.MM.yyyy", RuCulture) : "—";
+    }
+
+    private static string GetMetricAccentClass(SummaryMetricVm metric)
+    {
+        return metric.Accent switch
+        {
+            MetricAccent.Positive => "metric-accent--positive",
+            MetricAccent.Negative => "metric-accent--negative",
+            _ => string.Empty
+        };
+    }
+
+    private sealed record ChartSegment(string Color, string DashArray, string DashOffset);
+}

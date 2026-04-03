@@ -30,10 +30,6 @@ namespace HomeBudgetShared.Models
         public decimal? TotalPrice { get; set; } = 0;
 
 
-        [Required]
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-
         public TransactionItem Clone() => (TransactionItem)MemberwiseClone();
 
         public (bool IsValid, string? ErrorMessage) Validate()
@@ -77,12 +73,6 @@ namespace HomeBudgetShared.Models
                             Messages.Error_TooLittle,
                             nameof(TotalPrice),
                             0));
-
-            if (CreatedAt == default)
-                return (false,
-                        String.Format(
-                            Messages.Error_Required,
-                            nameof(CreatedAt)));
 
             if (UnitPrice.HasValue &&
                 TotalPrice.HasValue)

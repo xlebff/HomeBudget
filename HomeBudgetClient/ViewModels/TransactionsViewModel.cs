@@ -1,9 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
-using HomeBudgetShared.Contracts;
 using HomeBudgetShared.Data;
 using HomeBudgetShared.Models;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq.Expressions;
 
 namespace HomeBudgetClient.Services
 {
@@ -25,29 +25,13 @@ namespace HomeBudgetClient.Services
         [ObservableProperty]
         private string _busyText;
 
-        //public async Task TestDataInsert(Guid userId)
-        //{
-        //    await ExecuteAsync(async () =>
-        //    {
-        //        await _context.Database.EnsureCreatedAsync();
-
-        //        var currencies = await _client.GetCurrenciesAsync();
-
-        //        foreach (var currency in currencies)
-        //        {
-        //            await _context.AddAsync(currency);
-        //        }
-        //    });
-        //}
-
-        public async Task LoadTransactionsAsync(Guid userId)
+        public async Task LoadTransactionsAsync()
         {
             await ExecuteAsync(async () =>
             {
-                var transactions = await _context.GetFilteredAsync<Transaction>(
-                    t => t.UserId == userId);
+                List<Transaction> transactions = [.. (await _context.GetAllAsync<Transaction>())];
 
-                if (transactions is not null && transactions.Any())
+                if (transactions is not null && transactions.Count != 0)
                 {
                     Transactions ??= [];
 
@@ -57,6 +41,13 @@ namespace HomeBudgetClient.Services
                     }
                 }
             }, "Fetching products...");
+        }
+
+        public async Task<List<Transaction>> FilteredTransactionsAsync(
+            Expression<Func<Transaction, bool>> predicate)
+        {
+            return [.. await _context
+                .GetFilteredAsync<Transaction>(predicate)];
         }
 
 

@@ -1,0 +1,121 @@
+﻿@page "/categories"
+@using HomeBudgetShared.Models
+@using Microsoft.EntityFrameworkCore
+@inject HomeBudgetShared.Data.AppDbContext Db
+
+<div class="transactions-page">
+    <div class="transactions-shell">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar__brand">
+                <h2 class="sidebar__brand__title">Home Budget</h2>
+                <p class="sidebar__brand__text">Управление финансами</p>
+            </div>
+
+            <nav class="sidebar__nav">
+                <a class="sidebar__nav__link" href="/">Главная</a>
+                <a class="sidebar__nav__link" href="/transactions">Транзакции</a>
+                <a class="sidebar__nav__link sidebar__nav__link_active" href="/categories">Категории</a>
+                <a class="sidebar__nav__link" href="/analysis">Аналитика</a>
+                <a class="sidebar__nav__link" href="/settings">Настройки</a>
+            </nav>
+        </aside>
+
+        <!-- Content -->
+        <main class="transactions-content">
+
+            <!-- Форма -->
+            <div class="card-block">
+                <h3 class="transaction-card__title">Добавить категорию</h3>
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Название</label>
+                        <input class="field__input" @bind="newCategory.Name" />
+                    </div>
+
+                    <div class="field">
+                        <label>Тип</label>
+                        <select class="field__input" @bind="newCategory.Type">
+                            <option value="income">Доход</option>
+                            <option value="expense">Расход</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="button button--primary" @onclick="AddCategory">
+                    Добавить
+                </button>
+            </div>
+
+            <!-- Список -->
+            <div class="transactions-list">
+                @foreach (var category in categories)
+                {
+                    <div class="transaction-card">
+                        <div class="transaction-card__header">
+                            <strong>@category.Name</strong>
+                            <span class="category-badge">@category.Type</span>
+                        </div>
+
+                        <div class="transaction-actions">
+                            <button class="button button--secondary"
+                                    @onclick="() => Edit(category)">
+                                Изменить
+                            </button>
+
+                            <button class="button button--danger"
+                                    @onclick="() => Delete(category)">
+                                Удалить
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </main>
+    </div>
+</div>
+
+@code {
+    private List<Category> categories = new();
+    private Category newCategory = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        categories = await Db.Categories
+            .Where(c => !c.IsDeleted)
+            .ToListAsync();
+    }
+
+    private async Task AddCategory()
+    {
+        newCategory.Id = Guid.NewGuid();
+        newCategory.CreatedAt = DateTime.UtcNow;
+        newCategory.UpdatedAt = DateTime.UtcNow;
+
+        await Db.Categories.AddAsync(newCategory);
+        await Db.SaveChangesAsync();
+
+        newCategory = new Category();
+        await Load();
+    }
+
+    private void Edit(Category c)
+    {
+        newCategory = c;
+    }
+
+    private async Task Delete(Category c)
+    {
+        Db.Categories.Remove(c);
+        await Db.SaveChangesAsync();
+        await Load();
+    }
+}

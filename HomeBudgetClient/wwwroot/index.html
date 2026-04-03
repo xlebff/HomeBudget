@@ -1,29 +1,45 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>HomeBudgetClient</title>
-    <base href="/" />
-    <link rel="stylesheet" href="app.css" />
-    <link rel="stylesheet" href="HomeBudgetClient.styles.css" />
-    <link rel="icon" href="data:,">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Home Budget</title>
+
+    <link href="app.css" rel="stylesheet" />
+    <link href="Sidebar.css" rel="stylesheet" />
+    <link href="Theme.css" rel="stylesheet" />
+    <link href="HomeBudgetClient.styles.css" rel="stylesheet" />
 </head>
-
 <body>
-
-    <div class="status-bar-safe-area"></div>
-
-    <div id="app">Loading...</div>
-
-    <div id="blazor-error-ui" data-nosnippet>
-        An unhandled error has occurred.
-        <a href="." class="reload">Reload</a>
-        <span class="dismiss">🗙</span>
+    <div id="app">
+        <div class="loading-screen" role="status" aria-live="polite" aria-label="Загрузка приложения">
+            <div class="loading-screen__card">
+                <div class="loading-screen__brand">
+                    <span class="loading-screen__badge">Home Budget</span>
+                    <div class="loading-screen__ring" aria-hidden="true"></div>
+                </div>
+                <div class="loading-screen__copy">
+                    <h1 class="loading-screen__title">Подготавливаем рабочее пространство</h1>
+                    <p class="loading-screen__text">Загружаем транзакции, валюты и аналитику, чтобы интерфейс открылся сразу в аккуратном и удобном виде.</p>
+                </div>
+                <div class="loading-screen__progress" aria-hidden="true">
+                    <span></span>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <script src="_framework/blazor.webview.js" autostart="false"></script>
-
+    <script src="_framework/blazor.webview.js"></script>
 </body>
+<script>
+    function setTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme);
+        localStorage.setItem("theme", theme);
+    }
 
+    (function () {
+        const saved = localStorage.getItem("theme") || "dark";
+        document.documentElement.setAttribute("data-theme", saved);
+    })();
+</script>
 </html>

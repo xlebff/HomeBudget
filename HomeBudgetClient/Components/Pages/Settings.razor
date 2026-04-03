@@ -1,0 +1,54 @@
+﻿@page "/settings"
+
+<div class="transactions-page">
+    <div class="transactions-shell">
+
+        <aside class="sidebar">
+            <div class="sidebar__brand">
+                <h2 class="sidebar__brand__title">Home Budget</h2>
+            </div>
+
+            <nav class="sidebar__nav">
+                <a class="sidebar__nav__link" href="/">Главная</a>
+                <a class="sidebar__nav__link" href="/transactions">Транзакции</a>
+                <a class="sidebar__nav__link" href="/categories">Категории</a>
+                <a class="sidebar__nav__link" href="/analysis">Аналитика</a>
+                <a class="sidebar__nav__link sidebar__nav__link_active" href="/settings">Настройки</a>
+            </nav>
+        </aside>
+
+        <main class="transactions-content">
+
+            <div class="card-block">
+                <h3 class="transaction-card__title">Тема</h3>
+
+                <div class="theme-switch">
+                    <button class="button button--secondary" @onclick="SetLightTheme">
+                        Светлая
+                    </button>
+
+                    <button class="button button--secondary" @onclick="SetDarkTheme">
+                        Тёмная
+                    </button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+@code {
+    void SetLightTheme()
+    {
+        var js = (IJSRuntime)JS;
+        js.InvokeVoidAsync("setTheme", "light");
+    }
+
+    void SetDarkTheme()
+    {
+        var js = (IJSRuntime)JS;
+        js.InvokeVoidAsync("setTheme", "dark");
+    }
+
+    [Inject] IJSRuntime JS { get; set; }
+}

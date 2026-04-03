@@ -1,0 +1,102 @@
+﻿.transactions-page {
+    min-height: 100%;
+    padding: clamp(0.9rem, 1.8vw, 1.4rem);
+}
+
+.transactions-shell {
+    width: min(100%, 120rem);
+    margin-inline: auto;
+    display: grid;
+    grid-template-columns: minmax(15rem, 18rem) minmax(0, 1fr);
+    gap: clamp(1rem, 1.8vw, 1.5rem);
+    align-items: start;
+}
+
+/* Контент НЕ растягивается */
+.transactions-content {
+    display: grid;
+    gap: clamp(1rem, 1.8vw, 1.5rem);
+    min-width: 0;
+}
+
+/* Форма */
+.card-block {
+    display: grid;
+    gap: 1rem;
+    padding: clamp(1.1rem, 2vw, 1.5rem);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), transparent 60%), var(--surface-color);
+    border: 0.0625rem solid var(--border-color);
+    border-radius: 1.5rem;
+}
+
+/* Сетка формы */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+/* Список */
+.transactions-list {
+    display: grid;
+    gap: 1rem;
+}
+
+/* Карточка категории */
+.transaction-card {
+    display: grid;
+    gap: 1rem;
+    padding: 1.2rem;
+    border-radius: 1.4rem;
+    border: 0.0625rem solid var(--border-color);
+    background: linear-gradient(135deg, rgba(192, 132, 252, 0.1), transparent 60%), var(--surface-color);
+    transition: 0.2s ease;
+}
+
+    .transaction-card:hover {
+        transform: translateY(-2px);
+        border-color: var(--border-strong);
+    }
+
+/* Заголовок */
+.transaction-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Бейдж типа */
+.category-badge {
+    padding: 0.35rem 0.7rem;
+    border-radius: 999rem;
+    font-size: 0.9rem;
+    background: rgba(96, 165, 250, 0.12);
+    border: 1px solid rgba(96, 165, 250, 0.25);
+}
+
+/* Кнопки */
+.transaction-actions {
+    display: flex;
+    gap: 0.7rem;
+}
+
+/* Адаптив */
+@media (max-width: 75rem) {
+    .transactions-shell {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 54rem) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .transaction-actions {
+        flex-direction: column;
+    }
+
+    .button {
+        width: 100%;
+    }
+}

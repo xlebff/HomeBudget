@@ -1,0 +1,403 @@
+@page "/transactions"
+@using System.Globalization
+@using Microsoft.EntityFrameworkCore
+@using HomeBudgetShared.Data
+@using HomeBudgetShared.Models
+@inject AppDbContext Db
+
+<PageTitle>Все транзакции</PageTitle>
+
+<div class="transactions-page">
+    <div class="transactions-shell">
+        <aside class="sidebar">
+            <div class="sidebar__brand card-block">
+                <h1 class="sidebar__brand__title">@_pageData.AppTitle</h1>
+                <p class="sidebar__brand__text">@_pageData.AppDescription</p>
+            </div>
+
+            <nav class="sidebar__nav" aria-label="Основная навигация">
+                <a class="sidebar__nav__link" href="/">Главная</a>
+                <a class="sidebar__nav__link sidebar__nav__link_active" href="/transactions">Транзакции</a>
+                <a class="sidebar__nav__link" href="/categories">Категории</a>
+                <a class="sidebar__nav__link" href="/analysis">Аналитика</a>
+                <a class="sidebar__nav__link" href="#">Настройки</a>
+            </nav>
+
+            <section class="sidebar__summary card-block">
+                <p class="card-label">Сводка по журналу</p>
+                <p class="sidebar__summary__value">@_pageData.TotalCount</p>
+                <p class="sidebar__summary__text">Всего операций в журнале. Исключённые из статистики записи остаются видимыми.</p>
+            </section>
+        </aside>
+
+        <div class="transactions-content">
+            <header class="hero card-panel">
+                <div class="hero__content">
+                    <span class="hero__badge">@_pageData.HeroBadge</span>
+                    <h2 class="hero__title">@_pageData.HeroTitle</h2>
+                    <p class="hero__text">@_pageData.HeroDescription</p>
+                </div>
+
+                <div class="hero__actions">
+                    <a class="button button--primary" href="/transactions/new">Добавить транзакцию</a>
+                    <a class="button button--secondary" href="/">На главную</a>
+                </div>
+            </header>
+
+            @if (_isLoading)
+            {
+                <section class="state-card card-panel">
+                    <h3 class="state-card__title">Загрузка транзакций…</h3>
+                    <p class="state-card__text">Страница получает полный журнал операций и их позиции.</p>
+                </section>
+            }
+            else if (!string.IsNullOrWhiteSpace(_loadError))
+            {
+                <section class="state-card state-card--error card-panel">
+                    <h3 class="state-card__title">Не удалось загрузить транзакции</h3>
+                    <p class="state-card__text">@_loadError</p>
+                </section>
+            }
+            else
+            {
+                <section class="metrics-grid">
+                    <article class="metric-card card-panel">
+                        <p class="card-label">Всего</p>
+                        <p class="metric-card__value">@_pageData.TotalCount</p>
+                        <p class="metric-card__note">Все найденные транзакции.</p>
+                    </article>
+                    <article class="metric-card card-panel">
+                        <p class="card-label">Учитываются</p>
+                        <p class="metric-card__value metric-accent--positive">@_pageData.ConsideredCount</p>
+                        <p class="metric-card__note">Эти записи попадают в статистику.</p>
+                    </article>
+                    <article class="metric-card card-panel">
+                        <p class="card-label">Не учитываются</p>
+                        <p class="metric-card__value metric-accent--negative">@_pageData.IgnoredCount</p>
+                        <p class="metric-card__note">Они видны в журнале, но не участвуют в аналитике.</p>
+                    </article>
+                </section>
+
+                @if (!string.IsNullOrWhiteSpace(_actionMessage))
+                {
+                    <section class="state-card card-panel">
+                        <p class="state-card__text">@_actionMessage</p>
+                    </section>
+                }
+
+                @if (_pageData.Transactions.Count == 0)
+                {
+                    <section class="state-card card-panel">
+                        <h3 class="state-card__title">Пока пусто</h3>
+                        <p class="state-card__text">@_pageData.EmptyStateText</p>
+                    </section>
+                }
+                else
+                {
+                    <section class="transactions-list">
+                        @foreach (var transaction in _pageData.Transactions)
+                        {
+                            <article class="transaction-card card-panel">
+                                <div class="transaction-card__header">
+                                    <div class="transaction-card__heading">
+                                        <h3 class="transaction-card__title">@transaction.Category</h3>
+                                        <p class="transaction-card__subtitle">@transaction.Comment</p>
+                                    </div>
+
+                                    <div class="transaction-card__badges">
+                                        <span class="badge @(transaction.TypeLabel == "Доход" ? "badge--positive" : "badge--negative")">@transaction.TypeLabel</span>
+                                        <span class="badge @(transaction.IsConsidered ? "badge--neutral" : "badge--warning")">
+                                            @(transaction.IsConsidered ? "Учитывается" : "Не учитывается")
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <dl class="details-grid">
+                                    <div class="details-item">
+                                        <dt>Сумма</dt>
+                                        <dd>@FormatMoney(transaction.TotalAmount, transaction.CurrencySymbol)</dd>
+                                    </div>
+                                    <div class="details-item">
+                                        <dt>Валюта</dt>
+                                        <dd>@transaction.CurrencyCode (@transaction.CurrencySymbol)</dd>
+                                    </div>
+                                    <div class="details-item">
+                                        <dt>Дата</dt>
+                                        <dd>@FormatDate(transaction.Date)</dd>
+                                    </div>
+                                    <div class="details-item">
+                                        <dt>Тип</dt>
+                                        <dd>@transaction.TypeLabel</dd>
+                                    </div>
+                                </dl>
+
+                                @if (transaction.Lines.Count > 0)
+                                {
+                                    <section class="line-items">
+                                        <div class="line-items__header">
+                                            <span>Позиции</span>
+                                            <span>Сумма</span>
+                                        </div>
+                                        @foreach (var line in transaction.Lines)
+                                        {
+                                            <div class="line-item">
+                                                <div class="line-item__info">
+                                                    <strong>@line.Title</strong>
+                                                    @if (!string.IsNullOrWhiteSpace(line.Subtitle))
+                                                    {
+                                                        <span>@line.Subtitle</span>
+                                                    }
+                                                </div>
+                                                <strong class="line-item__amount">@FormatMoney(line.Amount, transaction.CurrencySymbol)</strong>
+                                            </div>
+                                        }
+                                    </section>
+                                }
+
+                                <footer class="transaction-actions">
+                                    <a class="button button--secondary" href="@transaction.EditUrl">Изменить</a>
+                                    <button class="button button--secondary" type="button" @onclick="() => ToggleConsideredAsync(transaction.Id, transaction.IsConsidered)">
+                                        @(transaction.IsConsidered ? "Не учитывать" : "Учитывать")
+                                    </button>
+                                    <button class="button button--danger" type="button" @onclick="() => DeleteAsync(transaction.Id)">Удалить</button>
+                                </footer>
+                            </article>
+                        }
+                    </section>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly CultureInfo RuCulture = CultureInfo.GetCultureInfo("ru-RU");
+
+    private TransactionsPageVm _pageData = TransactionsPageVm.CreateDefault();
+    private bool _isLoading = true;
+    private string? _loadError;
+    private string? _actionMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            var categories = await Db.Categories
+                .AsNoTracking()
+                .Where(category => !category.IsDeleted)
+                .ToDictionaryAsync(category => category.Id);
+
+            var currencies = await Db.Currencies
+                .AsNoTracking()
+                .ToDictionaryAsync(currency => currency.Id);
+
+            var transactions = await Db.Transactions
+                .AsNoTracking()
+                .Include(transaction => transaction.Items)
+                .Where(transaction => !transaction.IsDeleted)
+                .OrderByDescending(transaction => transaction.Date)
+                .ThenByDescending(transaction => transaction.CreatedAt)
+                .ToListAsync();
+
+            var items = transactions.Select(transaction =>
+            {
+                categories.TryGetValue(transaction.CategoryId ?? Guid.Empty, out var category);
+                currencies.TryGetValue(transaction.CurrencyId, out var currency);
+
+                var lines = transaction.Items?
+                    .OrderBy(item => item.Name)
+                    .Select(item =>
+                    {
+                        var lineAmount = item.TotalPrice ?? ((item.UnitPrice ?? 0m) * Math.Max(1, item.Quantity));
+                        var subtitleParts = new List<string>();
+
+                        if (item.Quantity > 1)
+                        {
+                            subtitleParts.Add($"Количество: {item.Quantity}");
+                        }
+
+                        if ((item.UnitPrice ?? 0m) > 0m)
+                        {
+                            subtitleParts.Add($"Цена: {FormatMoney(item.UnitPrice ?? 0m, currency?.Symbol ?? "₽")}");
+                        }
+
+                        return new TransactionLineVm
+                        {
+                            Title = string.IsNullOrWhiteSpace(item.Name) ? "Позиция" : item.Name,
+                            Subtitle = subtitleParts.Count > 0 ? string.Join(" · ", subtitleParts) : null,
+                            Amount = lineAmount
+                        };
+                    })
+                    .ToList() ?? [];
+
+                var totalAmount = transaction.TotalAmount;
+                if (lines.Count > 0)
+                {
+                    var linesTotal = lines.Sum(line => line.Amount);
+                    if (linesTotal > 0m)
+                    {
+                        totalAmount = linesTotal;
+                    }
+                }
+
+                var normalizedType = NormalizeType(category?.Type);
+
+                return new TransactionListItemVm
+                {
+                    Id = transaction.Id,
+                    Category = string.IsNullOrWhiteSpace(category?.Name) ? "Без категории" : category!.Name,
+                    Comment = string.IsNullOrWhiteSpace(transaction.Comment) ? "—" : transaction.Comment!,
+                    CurrencyCode = string.IsNullOrWhiteSpace(currency?.Code) ? "RUB" : currency!.Code,
+                    CurrencySymbol = string.IsNullOrWhiteSpace(currency?.Symbol) ? "₽" : currency!.Symbol,
+                    Date = transaction.Date,
+                    IsConsidered = transaction.IsConsidered,
+                    TypeLabel = normalizedType == "income" ? "Доход" : normalizedType == "expense" ? "Расход" : "Другое",
+                    TotalAmount = totalAmount,
+                    EditUrl = $"/transactions/edit/{transaction.Id}",
+                    Lines = lines
+                };
+            }).ToList();
+
+            _pageData = new TransactionsPageVm
+            {
+                AppTitle = "Home Budget",
+                AppDescription = "Журнал всех операций с удобным просмотром позиций, быстрым переключением статуса и переходом к редактированию.",
+                HeroBadge = "Операции",
+                HeroTitle = "Все транзакции",
+                HeroDescription = "Здесь собраны доходы и расходы. Можно открыть запись, отключить её из статистики или удалить из активного списка.",
+                EmptyStateText = "В журнале пока нет транзакций.",
+                TotalCount = items.Count,
+                ConsideredCount = items.Count(item => item.IsConsidered),
+                IgnoredCount = items.Count(item => !item.IsConsidered),
+                Transactions = items
+            };
+        }
+        catch (Exception exception)
+        {
+            _loadError = exception.Message;
+            _pageData = TransactionsPageVm.CreateDefault();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ToggleConsideredAsync(Guid transactionId, bool isCurrentlyConsidered)
+    {
+        try
+        {
+            var transaction = await Db.Transactions.FirstOrDefaultAsync(item => item.Id == transactionId && !item.IsDeleted);
+            if (transaction is null)
+            {
+                _actionMessage = "Транзакция не найдена.";
+                return;
+            }
+
+            transaction.IsConsidered = !isCurrentlyConsidered;
+            transaction.UpdatedAt = DateTime.UtcNow;
+            await Db.SaveChangesAsync();
+
+            _actionMessage = isCurrentlyConsidered
+                ? "Транзакция исключена из статистики."
+                : "Транзакция снова учитывается в статистике.";
+
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            _actionMessage = $"Не удалось изменить состояние транзакции: {exception.Message}";
+        }
+    }
+
+    private async Task DeleteAsync(Guid transactionId)
+    {
+        try
+        {
+            var transaction = await Db.Transactions.FirstOrDefaultAsync(item => item.Id == transactionId && !item.IsDeleted);
+            if (transaction is null)
+            {
+                _actionMessage = "Транзакция уже удалена или не найдена.";
+                return;
+            }
+
+            transaction.IsDeleted = true;
+            transaction.UpdatedAt = DateTime.UtcNow;
+            await Db.SaveChangesAsync();
+
+            _actionMessage = "Транзакция удалена.";
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            _actionMessage = $"Не удалось удалить транзакцию: {exception.Message}";
+        }
+    }
+
+    private static string NormalizeType(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "income" or "доход" => "income",
+            "expense" or "расход" => "expense",
+            _ => string.Empty
+        };
+    }
+
+    private static string FormatMoney(decimal value, string currencySymbol)
+    {
+        return $"{value:N2} {currencySymbol}";
+    }
+
+    private static string FormatDate(DateTime? value)
+    {
+        return value.HasValue ? value.Value.ToString("dd.MM.yyyy", RuCulture) : "—";
+    }
+
+    private sealed class TransactionsPageVm
+    {
+        public string AppTitle { get; set; } = "Home Budget";
+        public string AppDescription { get; set; } = "Журнал операций.";
+        public string HeroBadge { get; set; } = "Операции";
+        public string HeroTitle { get; set; } = "Все транзакции";
+        public string HeroDescription { get; set; } = "Просмотр журнала операций.";
+        public string EmptyStateText { get; set; } = "Нет данных.";
+        public int TotalCount { get; set; }
+        public int ConsideredCount { get; set; }
+        public int IgnoredCount { get; set; }
+        public List<TransactionListItemVm> Transactions { get; set; } = [];
+
+        public static TransactionsPageVm CreateDefault() => new();
+    }
+
+    private sealed class TransactionListItemVm
+    {
+        public Guid Id { get; set; }
+        public string Category { get; set; } = "Без категории";
+        public string Comment { get; set; } = "—";
+        public string CurrencyCode { get; set; } = "RUB";
+        public string CurrencySymbol { get; set; } = "₽";
+        public DateTime? Date { get; set; }
+        public string TypeLabel { get; set; } = "—";
+        public bool IsConsidered { get; set; }
+        public decimal TotalAmount { get; set; }
+        public string EditUrl { get; set; } = string.Empty;
+        public List<TransactionLineVm> Lines { get; set; } = [];
+    }
+
+    private sealed class TransactionLineVm
+    {
+        public string Title { get; set; } = string.Empty;
+        public string? Subtitle { get; set; }
+        public decimal Amount { get; set; }
+    }
+}

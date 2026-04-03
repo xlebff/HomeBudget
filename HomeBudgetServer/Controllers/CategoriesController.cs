@@ -19,60 +19,37 @@ namespace HomeBudgetServer.Controllers
         [HttpGet]
         public async Task<IActionResult> Get()
         {
-            var user = await this.GetAuthenticatedUserAsync(_context);
-            if (user == null) return Unauthorized();
+            User? user = await this.GetAuthenticatedUserAsync(_context);
+            if (user is null) return Unauthorized();
 
-            var categories = await _context.GetFilteredAsync<Category>(
-                 c => c.UserId == user.Id ||
-                      c.UserId == null);
+            List<Category> categories =
+                [..
+                    await _context.GetFilteredAsync<Category>(
+                    c => c.UserId == user.Id ||
+                         c.UserId == null)
+                ];
 
-            if (!categories.Any()) return NoContent();
+            if (categories.Count == 0) return NoContent();
 
-            var categoriesDTO = new List<CategoryResponse>();
-
-            foreach (var category in categories)
-            {
-                categoriesDTO.Add(new CategoryResponse
-                {
-                    Id = category.Id,
-                    UserId = category.UserId,
-                    Name = category.Name,
-                    Type = category.Type,
-                    CreatedAt = category.CreatedAt,
-                    UpdatedAt = category.UpdatedAt,
-                    SyncedAt = category.SyncedAt,
-                    IsDeleted = category.IsDeleted
-                });
-            }
-
-            return Ok(categoriesDTO);
+            return Ok(categories);
         }
 
         // GET: api/categories/{id}
         [HttpGet("{id:guid}")]
-        public async Task<ActionResult<Category>> Get(Guid id)
+        public async Task<ActionResult<Category>> Get([FromRoute] Guid id)
         {
-            var user = await this.GetAuthenticatedUserAsync(_context);
-            if (user == null) return Unauthorized();
+            User? user = await this.GetAuthenticatedUserAsync(_context);
+            if (user is null) return Unauthorized();
 
-            var category = (await _context.GetFilteredAsync<Category>(
+            Category? category = (await _context.GetFilteredAsync<Category>(
                 c => (c.UserId == user.Id ||
-                      c.UserId == null) &&
+                     c.UserId == null) &&
                      c.Id == id))
-                .FirstOrDefault();
+                     .FirstOrDefault();
 
             if (category is null) return NotFound();
 
-            return Ok(new CategoryResponse
-            {
-                Id = category.Id,
-                UserId = category.UserId,
-                Name = category.Name,
-                Type = category.Type,
-                CreatedAt = category.CreatedAt,
-                UpdatedAt = category.UpdatedAt,
-                SyncedAt = category.SyncedAt
-            });
+            return Ok(category);
         }
 
         // POST: api/categories
@@ -80,10 +57,19 @@ namespace HomeBudgetServer.Controllers
         public async Task<IActionResult> Post(
             [FromBody] CreateCategoryRequest request)
         {
-            var user = await this.GetAuthenticatedUserAsync(_context);
-            if (user == null) return Unauthorized();
+            User? user = await this.GetAuthenticatedUserAsync(_context);
+            if (user is null) return Unauthorized();
 
-            var category = new Category
+            Category? exists = (await _context.GetFilteredAsync<Category>(
+                c => c.UserId == user.Id &&
+                     c.Name == request.Name))
+                     .FirstOrDefault();
+
+            if (exists is not null) return Conflict(String.Format(
+                    Messages.Error_UniqueCategoryName,
+                    request.Name));
+
+            Category category = new()
             {
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
@@ -100,48 +86,29 @@ namespace HomeBudgetServer.Controllers
             if (!IsValid)
                 return BadRequest(ErrorMessage);
 
-            var exists = await _context.GetFilteredAsync<Category>(
-                c => c.UserId == user.Id && c.Name == request.Name);
-            if (exists.FirstOrDefault() is not null)
-                return Conflict(String.Format(
-                    Messages.Error_UniqueCategoryName,
-                    request.Name));
-
             await _context.AddAsync(category);
             await _context.SaveChangesAsync();
-
-            var response = new CategoryResponse
-            {
-                Id = category.Id,
-                UserId = category.UserId,
-                Name = category.Name,
-                Type = category.Type,
-                CreatedAt = category.CreatedAt,
-                UpdatedAt = category.UpdatedAt,
-                SyncedAt = category.SyncedAt,
-                IsDeleted = category.IsDeleted
-            };
-
-            return CreatedAtAction(nameof(Get), 
-                new { id = category.Id }, response);
+            
+            return Ok(category);
         }
 
         // PUT: api/categories/
         [HttpPut("{id:guid}")]
-        public async Task<IActionResult> Put(Guid id,
+        public async Task<IActionResult> Put([FromRoute] Guid id,
                                              [FromBody] Category category)
         {
-            var user = await this.GetAuthenticatedUserAsync(_context);
-            if (user == null) return Unauthorized();
+            User? user = await this.GetAuthenticatedUserAsync(_context);
+            if (user is null) return Unauthorized();
 
-            var existing = await _context.FindAsync<Category>(id);
-            if (existing == null) return NotFound();
+            Category? existing = await _context.FindAsync<Category>(id);
+            if (existing is null) return NotFound();
 
             if (existing.UserId != user.Id) return Forbid();
 
             existing.Name = category.Name;
             existing.Type = category.Type;
             existing.UpdatedAt = DateTime.UtcNow;
+            existing.SyncedAt = category.SyncedAt;
             existing.IsDeleted = category.IsDeleted;
 
             var (IsValid, ErrorMessage) = existing.Validate();
@@ -149,28 +116,18 @@ namespace HomeBudgetServer.Controllers
                 return BadRequest(ErrorMessage);
 
             await _context.SaveChangesAsync();
-            return Ok(new CategoryResponse
-            {
-                Id = existing.Id,
-                UserId = existing.UserId,
-                Name = existing.Name,
-                Type = existing.Type,
-                CreatedAt = existing.CreatedAt,
-                UpdatedAt = existing.UpdatedAt,
-                SyncedAt = existing.SyncedAt,
-                IsDeleted = existing.IsDeleted
-            });
+            return Ok(category);
         }
 
         // DELETE: api/categories/{id}
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var user = await this.GetAuthenticatedUserAsync(_context);
-            if (user == null) return Unauthorized();
+            User? user = await this.GetAuthenticatedUserAsync(_context);
+            if (user is null) return Unauthorized();
 
-            var category = await _context.FindAsync<Category>(id);
-            if (category == null) return NoContent();
+            Category? category = await _context.FindAsync<Category>(id);
+            if (category is null) return NoContent();
 
             if (category.UserId != user.Id) return Forbid();
 

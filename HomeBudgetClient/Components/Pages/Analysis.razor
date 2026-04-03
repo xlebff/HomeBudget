@@ -1,0 +1,708 @@
+@page "/analysis"
+@using System.Globalization
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
+@using HomeBudgetShared.Data
+@using HomeBudgetShared.Models
+@inject AppDbContext Db
+
+<PageTitle>Аналитика</PageTitle>
+
+<div class="analysis-page">
+    <div class="analysis-shell">
+        <aside class="sidebar">
+            <div class="sidebar__brand card-block">
+                <h1 class="sidebar__brand__title">Home Budget</h1>
+                <p class="sidebar__brand__text">Гибкий анализ с рабочими фильтрами по типу, категориям и датам без лишней перегрузки интерфейса.</p>
+            </div>
+
+            <nav class="sidebar__nav">
+                <a class="sidebar__nav__link" href="/">Главная</a>
+                <a class="sidebar__nav__link" href="/transactions">Транзакции</a>
+                <a class="sidebar__nav__link" href="/categories">Категории</a>
+                <a class="sidebar__nav__link sidebar__nav__link_active" href="/analysis">Аналитика</a>
+                <a class="sidebar__nav__link" href="#">Настройки</a>
+            </nav>
+
+            <section class="sidebar__summary card-block">
+                <p class="card-label">После фильтрации</p>
+                <p class="sidebar__summary__value">@_result.TotalCount</p>
+                <p class="sidebar__summary__text">Суммы ниже приведены к рублям. Доллары автоматически считаются по курсу 1 USD = 90 ₽.</p>
+            </section>
+        </aside>
+
+        <div class="analysis-content">
+            <header class="hero card-panel">
+                <div class="hero__content">
+                    <span class="hero__badge">Аналитика</span>
+                    <h2 class="hero__title">Фильтрация и визуализация транзакций</h2>
+                    <p class="hero__text">Меняй тип, категории и период — сводка, диаграмма и список операций обновятся сразу после применения фильтра.</p>
+                </div>
+
+            </header>
+
+            @if (_isLoading)
+            {
+                <section class="state-card card-panel" aria-live="polite">
+                    <h3 class="state-card__title">Загрузка аналитики…</h3>
+                    <p class="state-card__text">Подготавливаем категории, транзакции и данные для диаграммы.</p>
+                </section>
+            }
+            else if (!string.IsNullOrWhiteSpace(_loadError))
+            {
+                <section class="state-card state-card--error card-panel" aria-live="assertive">
+                    <h3 class="state-card__title">Не удалось загрузить страницу</h3>
+                    <p class="state-card__text">@_loadError</p>
+                </section>
+            }
+            else
+            {
+                <section class="filters-card card-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="card-label">Фильтры</p>
+                            <h3 class="panel-heading__title">Условия отбора</h3>
+                        </div>
+                        <span class="selection-note">@SelectedCategoriesText</span>
+                    </div>
+
+                    <div class="filters-grid">
+                        <label class="field">
+                            <span class="field__label">Тип транзакции</span>
+                            <select class="field__input field__input--select" value="@_filters.Type" @onchange="OnTypeChanged">
+                                <option value="all">Все</option>
+                                <option value="income">Доходы</option>
+                                <option value="expense">Расходы</option>
+                            </select>
+                        </label>
+
+                        <label class="field">
+                            <span class="field__label">Период</span>
+                            <select class="field__input field__input--select" value="@_filters.Period" @onchange="OnPeriodChanged">
+                                <option value="all">За всё время</option>
+                                <option value="currentMonth">Текущий месяц</option>
+                                <option value="last30">Последние 30 дней</option>
+                                <option value="last90">Последние 90 дней</option>
+                                <option value="currentYear">Текущий год</option>
+                                <option value="custom">Произвольный диапазон</option>
+                            </select>
+                        </label>
+
+                        <label class="field">
+                            <span class="field__label">Дата от</span>
+                            <InputDate TValue="DateTime?" class="field__input" @bind-Value="_filters.DateFrom" disabled="@(!_filters.IsCustomPeriod)" />
+                        </label>
+
+                        <label class="field">
+                            <span class="field__label">Дата до</span>
+                            <InputDate TValue="DateTime?" class="field__input" @bind-Value="_filters.DateTo" disabled="@(!_filters.IsCustomPeriod)" />
+                        </label>
+                    </div>
+
+                    <div class="categories-block">
+                        @if (FilteredCategories.Count == 0)
+                        {
+                            <p class="empty-text">Для выбранного типа пока нет доступных категорий.</p>
+                        }
+                        else
+                        {
+                            <div class="category-chips">
+                                @foreach (var category in FilteredCategories)
+                                {
+                                    <label class="category-chip @(IsCategorySelected(category.Id) ? "category-chip--selected" : string.Empty)">
+                                        <input type="checkbox"
+                                               checked="@IsCategorySelected(category.Id)"
+                                               @onchange="args => ToggleCategory(category.Id, args.Value is bool value && value)" />
+                                        <span>@category.Name</span>
+                                        <small>@category.TypeLabel</small>
+                                    </label>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div class="filters-actions">
+                        <button class="button button--primary" type="button" @onclick="ApplyFiltersAsync" disabled="@_isBusy">Применить фильтры</button>
+                        <button class="button button--secondary" type="button" @onclick="ResetFiltersAsync" disabled="@_isBusy">Сбросить</button>
+                    </div>
+                </section>
+
+                <section class="metrics-grid" aria-label="Сводные показатели">
+                    <article class="metric-card card-panel">
+                        <p class="card-label">Транзакции</p>
+                        <p class="metric-card__value">@_result.TotalCount</p>
+                        <p class="metric-card__note">Количество операций после фильтрации.</p>
+                    </article>
+                    <article class="metric-card card-panel">
+                        <p class="card-label">Доходы</p>
+                        <p class="metric-card__value metric-accent--positive">@FormatMoney(_result.TotalIncome, _result.CurrencySymbol)</p>
+                        <p class="metric-card__note">Сумма доходов после пересчёта в рубли.</p>
+                    </article>
+                    <article class="metric-card card-panel">
+                        <p class="card-label">Расходы</p>
+                        <p class="metric-card__value metric-accent--negative">@FormatMoney(_result.TotalExpense, _result.CurrencySymbol)</p>
+                        <p class="metric-card__note">Сумма расходов после пересчёта в рубли.</p>
+                    </article>
+                    <article class="metric-card card-panel">
+                        <p class="card-label">Баланс</p>
+                        <p class="metric-card__value @(GetBalanceClass(_result.Balance))">@FormatMoney(_result.Balance, _result.CurrencySymbol)</p>
+                        <p class="metric-card__note">Разница между доходами и расходами.</p>
+                    </article>
+                </section>
+
+                <section class="charts-stack">
+                    @ChartCard(_result.MainChart)
+                </section>
+
+                <article class="transactions-preview card-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <p class="card-label">Операции</p>
+                            <h3 class="panel-heading__title">Транзакции по текущему фильтру</h3>
+                        </div>
+                    </div>
+
+                    @if (_result.Transactions.Count == 0)
+                    {
+                        <p class="empty-text">По выбранным условиям транзакции не найдены.</p>
+                    }
+                    else
+                    {
+                        <div class="preview-list">
+                            @foreach (var transaction in _result.Transactions.Take(12))
+                            {
+                                <div class="preview-item">
+                                    <div class="preview-item__info">
+                                        <strong>@transaction.CategoryName</strong>
+                                        <span>@transaction.TypeLabel · @transaction.Date.ToString("dd.MM.yyyy", RuCulture)</span>
+                                        @if (!string.IsNullOrWhiteSpace(transaction.Comment))
+                                        {
+                                            <small>@transaction.Comment</small>
+                                        }
+                                    </div>
+                                    <strong class="preview-item__amount @(transaction.Type == "income" ? "metric-accent--positive" : "metric-accent--negative")">
+                                        @FormatMoney(transaction.TotalAmountRub, _result.CurrencySymbol)
+                                    </strong>
+                                </div>
+                            }
+                        </div>
+                    }
+                </article>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private static readonly CultureInfo RuCulture = CultureInfo.GetCultureInfo("ru-RU");
+    private const decimal UsdToRubRate = 90m;
+
+    [SupplyParameterFromQuery(Name = "userId")]
+    public Guid? UserId { get; set; }
+
+    private readonly AnalysisFilters _filters = new();
+    private readonly List<CategoryFilterOption> _categories = [];
+    private readonly HashSet<Guid> _selectedCategoryIds = [];
+
+    private bool _isLoading = true;
+    private bool _isBusy;
+    private string? _loadError;
+    private Guid? _resolvedUserId;
+    private AnalysisResult _result = AnalysisResult.Empty();
+
+    private IReadOnlyList<string> IncomeColors =>
+    [
+        "var(--income-1)", "var(--income-2)", "var(--income-3)", "var(--income-4)",
+        "var(--income-5)", "var(--income-6)", "var(--income-7)", "var(--income-8)"
+    ];
+
+    private IReadOnlyList<string> ExpenseColors =>
+    [
+        "var(--expense-1)", "var(--expense-2)", "var(--expense-3)", "var(--expense-4)",
+        "var(--expense-5)", "var(--expense-6)", "var(--expense-7)", "var(--expense-8)"
+    ];
+
+    private List<CategoryFilterOption> FilteredCategories => _categories
+        .Where(category => _filters.Type == "all" || category.Type == _filters.Type)
+        .OrderBy(category => category.TypeOrder)
+        .ThenBy(category => category.Name)
+        .ToList();
+
+    private string SelectedCategoriesText => _selectedCategoryIds.Count == 0
+        ? "Категории: все"
+        : $"Категории: {_selectedCategoryIds.Count}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+
+        try
+        {
+            _resolvedUserId = await ResolveUserIdAsync();
+            await LoadCategoriesAsync();
+            await ApplyFiltersCoreAsync();
+        }
+        catch (Exception exception)
+        {
+            _loadError = exception.Message;
+            _result = AnalysisResult.Empty();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task LoadCategoriesAsync()
+    {
+        var query = Db.Categories
+            .AsNoTracking()
+            .Where(category => !category.IsDeleted);
+
+        if (_resolvedUserId.HasValue)
+        {
+            query = query.Where(category => category.UserId == _resolvedUserId.Value);
+        }
+
+        var categories = await query
+            .OrderBy(category => category.Name)
+            .Select(category => new CategoryFilterOption
+            {
+                Id = category.Id,
+                Name = category.Name,
+                Type = NormalizeType(category.Type)
+            })
+            .ToListAsync();
+
+        _categories.Clear();
+        _categories.AddRange(categories.Select(category =>
+        {
+            category.TypeLabel = category.Type switch
+            {
+                "income" => "Доход",
+                "expense" => "Расход",
+                _ => "Другое"
+            };
+            category.TypeOrder = category.Type switch
+            {
+                "expense" => 0,
+                "income" => 1,
+                _ => 2
+            };
+            return category;
+        }));
+    }
+
+    private async Task<Guid?> ResolveUserIdAsync()
+    {
+        if (UserId.HasValue && UserId.Value != Guid.Empty)
+        {
+            var exists = await Db.Users.AsNoTracking().AnyAsync(user => user.Id == UserId.Value);
+            if (exists)
+            {
+                return UserId.Value;
+            }
+        }
+
+        var users = await Db.Users.AsNoTracking().OrderBy(user => user.Login).ToListAsync();
+        return users.Count == 1 ? users[0].Id : null;
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _isBusy = true;
+        try
+        {
+            await ApplyFiltersCoreAsync();
+        }
+        finally
+        {
+            _isBusy = false;
+        }
+    }
+
+    private async Task ResetFiltersAsync()
+    {
+        if (_isBusy)
+        {
+            return;
+        }
+
+        _filters.Type = "all";
+        _filters.Period = "all";
+        _filters.DateFrom = null;
+        _filters.DateTo = null;
+        _selectedCategoryIds.Clear();
+
+        await ApplyFiltersAsync();
+    }
+
+    private async Task ApplyFiltersCoreAsync()
+    {
+        _selectedCategoryIds.RemoveWhere(id => !_categories.Any(category => category.Id == id));
+
+        var transactionsQuery = Db.Transactions
+            .AsNoTracking()
+            .Where(transaction => !transaction.IsDeleted && transaction.IsConsidered);
+
+        if (_resolvedUserId.HasValue)
+        {
+            transactionsQuery = transactionsQuery.Where(transaction => transaction.UserId == _resolvedUserId.Value);
+        }
+
+        if (_selectedCategoryIds.Count > 0)
+        {
+            transactionsQuery = transactionsQuery.Where(transaction => transaction.CategoryId.HasValue && _selectedCategoryIds.Contains(transaction.CategoryId.Value));
+        }
+
+        var (startDate, endDate) = GetPeriodRange();
+        if (startDate.HasValue)
+        {
+            transactionsQuery = transactionsQuery.Where(transaction => transaction.Date >= startDate.Value.Date);
+        }
+
+        if (endDate.HasValue)
+        {
+            var exclusiveEnd = endDate.Value.Date.AddDays(1);
+            transactionsQuery = transactionsQuery.Where(transaction => transaction.Date < exclusiveEnd);
+        }
+
+        var categoriesById = await Db.Categories
+            .AsNoTracking()
+            .Where(category => !category.IsDeleted)
+            .ToDictionaryAsync(category => category.Id);
+
+        var currenciesById = await Db.Currencies
+            .AsNoTracking()
+            .ToDictionaryAsync(currency => currency.Id);
+
+        var transactions = await transactionsQuery
+            .OrderByDescending(transaction => transaction.Date)
+            .ThenByDescending(transaction => transaction.CreatedAt)
+            .ToListAsync();
+
+        var projected = transactions.Select(transaction =>
+        {
+            categoriesById.TryGetValue(transaction.CategoryId ?? Guid.Empty, out var category);
+            currenciesById.TryGetValue(transaction.CurrencyId, out var currency);
+
+            var type = NormalizeType(category?.Type);
+            return new AnalysisTransactionVm
+            {
+                Id = transaction.Id,
+                Date = transaction.Date,
+                Comment = string.IsNullOrWhiteSpace(transaction.Comment) ? null : transaction.Comment.Trim(),
+                TotalAmountRub = ConvertToRub(transaction.TotalAmount, currency?.Code),
+                CategoryId = transaction.CategoryId,
+                CategoryName = string.IsNullOrWhiteSpace(category?.Name) ? "Без категории" : category!.Name,
+                Type = type,
+                TypeLabel = type == "income" ? "Доход" : type == "expense" ? "Расход" : "Другое",
+                CurrencyId = transaction.CurrencyId,
+                CurrencyCode = string.IsNullOrWhiteSpace(currency?.Code) ? "RUB" : currency!.Code
+            };
+        }).ToList();
+
+        if (_filters.Type != "all")
+        {
+            projected = projected.Where(transaction => transaction.Type == _filters.Type).ToList();
+        }
+
+        if (_filters.IsCustomPeriod && _filters.DateFrom.HasValue && _filters.DateTo.HasValue && _filters.DateFrom > _filters.DateTo)
+        {
+            ( _filters.DateFrom, _filters.DateTo ) = ( _filters.DateTo, _filters.DateFrom );
+        }
+
+        var incomeTransactions = projected.Where(transaction => transaction.Type == "income").ToList();
+        var expenseTransactions = projected.Where(transaction => transaction.Type == "expense").ToList();
+
+        _result = new AnalysisResult
+        {
+            CurrencySymbol = "₽",
+            TotalCount = projected.Count,
+            TotalIncome = incomeTransactions.Sum(transaction => transaction.TotalAmountRub),
+            TotalExpense = expenseTransactions.Sum(transaction => transaction.TotalAmountRub),
+            Balance = incomeTransactions.Sum(transaction => transaction.TotalAmountRub) - expenseTransactions.Sum(transaction => transaction.TotalAmountRub),
+            Transactions = projected,
+            MainChart = BuildMainChart(projected)
+        };
+    }
+
+    private AnalysisChartVm BuildMainChart(List<AnalysisTransactionVm> source)
+    {
+        var chartSource = _filters.Type switch
+        {
+            "income" => source.Where(item => item.Type == "income").ToList(),
+            "expense" => source.Where(item => item.Type == "expense").ToList(),
+            _ => source
+        };
+
+        var slices = chartSource
+            .GroupBy(item => _filters.Type == "all" ? $"{item.CategoryName} · {item.TypeLabel}" : item.CategoryName)
+            .Select(group => new AnalysisSliceVm
+            {
+                Name = group.Key,
+                Amount = group.Sum(item => item.TotalAmountRub)
+            })
+            .Where(item => item.Amount > 0m)
+            .OrderByDescending(item => item.Amount)
+            .Take(10)
+            .ToList();
+
+        var title = _filters.Type switch
+        {
+            "income" => "Распределение доходов по категориям",
+            "expense" => "Распределение расходов по категориям",
+            _ => "Распределение операций по категориям и типам"
+        };
+
+        var label = _filters.Type switch
+        {
+            "income" => "Диаграмма доходов",
+            "expense" => "Диаграмма расходов",
+            _ => "Общая диаграмма"
+        };
+
+        return new AnalysisChartVm
+        {
+            Label = label,
+            Title = title,
+            EmptyStateText = "По текущему фильтру недостаточно данных для построения диаграммы.",
+            CurrencySymbol = "₽",
+            IsIncome = _filters.Type != "expense",
+            TotalAmount = slices.Sum(item => item.Amount),
+            Slices = slices
+        };
+    }
+
+    private (DateTime? Start, DateTime? End) GetPeriodRange()
+    {
+        var today = DateTime.Today;
+        return _filters.Period switch
+        {
+            "currentMonth" => (new DateTime(today.Year, today.Month, 1), today),
+            "last30" => (today.AddDays(-29), today),
+            "last90" => (today.AddDays(-89), today),
+            "currentYear" => (new DateTime(today.Year, 1, 1), today),
+            "custom" => (_filters.DateFrom?.Date, _filters.DateTo?.Date),
+            _ => (null, null)
+        };
+    }
+
+    private void OnTypeChanged(ChangeEventArgs args)
+    {
+        _filters.Type = args.Value?.ToString() ?? "all";
+        var allowedCategoryIds = FilteredCategories.Select(category => category.Id).ToHashSet();
+        _selectedCategoryIds.RemoveWhere(id => !allowedCategoryIds.Contains(id));
+    }
+
+    private void OnPeriodChanged(ChangeEventArgs args)
+    {
+        _filters.Period = args.Value?.ToString() ?? "all";
+        if (!_filters.IsCustomPeriod)
+        {
+            _filters.DateFrom = null;
+            _filters.DateTo = null;
+        }
+    }
+
+    private void ToggleCategory(Guid categoryId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            _selectedCategoryIds.Add(categoryId);
+        }
+        else
+        {
+            _selectedCategoryIds.Remove(categoryId);
+        }
+    }
+
+    private bool IsCategorySelected(Guid categoryId) => _selectedCategoryIds.Contains(categoryId);
+
+    private RenderFragment ChartCard(AnalysisChartVm chart) => @<article class="chart-card card-panel">
+        <div class="panel-heading">
+            <div>
+                <p class="card-label">@chart.Label</p>
+                <h3 class="panel-heading__title">@chart.Title</h3>
+            </div>
+        </div>
+
+        @if (chart.Slices.Count == 0 || chart.TotalAmount <= 0m)
+        {
+            <p class="empty-text">@chart.EmptyStateText</p>
+        }
+        else
+        {
+            var segments = BuildSegments(chart);
+            <div class="chart-layout">
+                <div class="chart-visual" aria-hidden="true">
+                    <svg class="chart-ring" viewBox="0 0 120 120" role="img">
+                        <circle class="chart-ring__track" cx="60" cy="60" r="42"></circle>
+                        @foreach (var segment in segments)
+                        {
+                            <circle class="chart-ring__segment"
+                                    cx="60"
+                                    cy="60"
+                                    r="42"
+                                    stroke="@segment.Color"
+                                    stroke-dasharray="@segment.DashArray"
+                                    stroke-dashoffset="@segment.DashOffset"></circle>
+                        }
+                    </svg>
+                    <div class="chart-total">
+                        <span class="chart-total__label">Итого</span>
+                        <strong>@FormatMoney(chart.TotalAmount, chart.CurrencySymbol)</strong>
+                    </div>
+                </div>
+
+                <ul class="chart-legend">
+                    @for (var index = 0; index < chart.Slices.Count; index++)
+                    {
+                        var slice = chart.Slices[index];
+                        var percent = chart.TotalAmount <= 0m ? 0m : Math.Round(slice.Amount / chart.TotalAmount * 100m, 1);
+                        var color = ResolveChartColor(chart.IsIncome, index);
+                        <li class="chart-legend__item">
+                            <span class="chart-legend__dot" style="background:@color;"></span>
+                            <div class="chart-legend__content">
+                                <div class="chart-legend__row">
+                                    <span>@slice.Name</span>
+                                    <strong>@FormatMoney(slice.Amount, chart.CurrencySymbol)</strong>
+                                </div>
+                                <div class="chart-legend__bar">
+                                    <span style="--share:@percent.ToString(CultureInfo.InvariantCulture); --bar-color:@color;"></span>
+                                </div>
+                                <span class="chart-legend__meta">@percent.ToString("0.0", CultureInfo.InvariantCulture)%</span>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+    </article>;
+
+    private List<ChartSegment> BuildSegments(AnalysisChartVm chart)
+    {
+        const double radius = 42d;
+        var circumference = 2d * Math.PI * radius;
+        var result = new List<ChartSegment>();
+        double offset = circumference * 0.25d;
+
+        for (var index = 0; index < chart.Slices.Count; index++)
+        {
+            var slice = chart.Slices[index];
+            var fraction = chart.TotalAmount <= 0m ? 0d : (double)(slice.Amount / chart.TotalAmount);
+            var length = circumference * fraction;
+            result.Add(new ChartSegment(
+                ResolveChartColor(chart.IsIncome, index),
+                $"{length.ToString(CultureInfo.InvariantCulture)} {(circumference - length).ToString(CultureInfo.InvariantCulture)}",
+                offset.ToString(CultureInfo.InvariantCulture)));
+            offset -= length;
+        }
+
+        return result;
+    }
+
+    private string ResolveChartColor(bool isIncome, int index)
+    {
+        var palette = isIncome ? IncomeColors : ExpenseColors;
+        return palette[index % palette.Count];
+    }
+
+    private static decimal ConvertToRub(decimal amount, string? currencyCode)
+    {
+        return string.Equals(currencyCode, "USD", StringComparison.OrdinalIgnoreCase)
+            ? amount * UsdToRubRate
+            : amount;
+    }
+
+    private static string GetBalanceClass(decimal value) => value < 0 ? "metric-accent--negative" : "metric-accent--positive";
+
+    private static string NormalizeType(string? value)
+    {
+        var normalized = value?.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "income" or "доход" => "income",
+            "expense" or "расход" => "expense",
+            _ => string.Empty
+        };
+    }
+
+    private static string FormatMoney(decimal value, string symbol) => $"{value:N2} {symbol}";
+
+    private sealed class AnalysisFilters
+    {
+        public string Type { get; set; } = "all";
+        public string Period { get; set; } = "all";
+        public DateTime? DateFrom { get; set; }
+        public DateTime? DateTo { get; set; }
+        public bool IsCustomPeriod => Period == "custom";
+    }
+
+    private sealed class CategoryFilterOption
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string TypeLabel { get; set; } = string.Empty;
+        public int TypeOrder { get; set; }
+    }
+
+    private sealed class AnalysisResult
+    {
+        public string CurrencySymbol { get; set; } = "₽";
+        public int TotalCount { get; set; }
+        public decimal TotalIncome { get; set; }
+        public decimal TotalExpense { get; set; }
+        public decimal Balance { get; set; }
+        public AnalysisChartVm MainChart { get; set; } = new();
+        public List<AnalysisTransactionVm> Transactions { get; set; } = [];
+
+        public static AnalysisResult Empty() => new();
+    }
+
+    private sealed class AnalysisChartVm
+    {
+        public string Label { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string EmptyStateText { get; set; } = string.Empty;
+        public string CurrencySymbol { get; set; } = "₽";
+        public bool IsIncome { get; set; }
+        public decimal TotalAmount { get; set; }
+        public List<AnalysisSliceVm> Slices { get; set; } = [];
+    }
+
+    private sealed class AnalysisSliceVm
+    {
+        public string Name { get; set; } = string.Empty;
+        public decimal Amount { get; set; }
+    }
+
+    private sealed class AnalysisTransactionVm
+    {
+        public Guid Id { get; set; }
+        public Guid? CategoryId { get; set; }
+        public Guid CurrencyId { get; set; }
+        public string CategoryName { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string TypeLabel { get; set; } = string.Empty;
+        public decimal TotalAmountRub { get; set; }
+        public DateTime Date { get; set; }
+        public string? Comment { get; set; }
+        public string CurrencyCode { get; set; } = "RUB";
+    }
+
+    private sealed record ChartSegment(string Color, string DashArray, string DashOffset);
+}

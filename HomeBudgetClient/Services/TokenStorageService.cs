@@ -17,7 +17,7 @@ namespace HomeBudgetClient.Services
             catch (Exception ex)
             {
                 Console.WriteLine(String.Format(
-                    Messages.Error_TokenSaving,
+                    ClientMessages.Error_TokenSaving,
                     ex.Message));
             }
         }
@@ -33,7 +33,7 @@ namespace HomeBudgetClient.Services
             catch (Exception ex)
             {
                 Console.WriteLine(String.Format(
-                    Messages.Error_TokenGetting,
+                    ClientMessages.Error_TokenGetting,
                     ex.Message));
                 return null;
             }
@@ -55,7 +55,7 @@ namespace HomeBudgetClient.Services
             catch (Exception ex)
             {
                 Console.WriteLine(String.Format(
-                    Messages.Error_UserIdGetting,
+                    ClientMessages.Error_UserIdGetting,
                     ex.Message));
                 return null;
             }
@@ -71,7 +71,7 @@ namespace HomeBudgetClient.Services
             catch (Exception ex)
             {
                 Console.WriteLine(String.Format(
-                    Messages.Error_UserDataRemoving,
+                    ClientMessages.Error_UserDataRemoving,
                     ex.Message));
             }
         }

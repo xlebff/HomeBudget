@@ -15,6 +15,7 @@ namespace HomeBudgetShared.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // Currency
             modelBuilder.Entity<Currency>()
                 .HasIndex(c => c.Code)
                 .IsUnique();
@@ -23,20 +24,17 @@ namespace HomeBudgetShared.Data
                 .HasIndex(c => c.Name)
                 .IsUnique();
 
-            //modelBuilder.Entity<Currency>()
-            //    .HasIndex(i => i.Id)
-            //    .IsCreatedConcurrently();
-
             modelBuilder.Entity<Currency>()
                 .HasIndex(i => i.Id);
 
+            // User
             modelBuilder.Entity<User>()
                 .HasIndex(u => u.Login)
                 .IsUnique();
 
             modelBuilder.Entity<User>()
-                .HasOne(u => u.Currency)
-                .WithMany(c => c.Users)
+                .HasOne<Currency>()
+                .WithMany()
                 .HasForeignKey(u => u.CurrencyId)
                 .OnDelete(DeleteBehavior.Restrict);
 
@@ -46,8 +44,8 @@ namespace HomeBudgetShared.Data
                 .IsUnique();
 
             modelBuilder.Entity<Category>()
-                .HasOne(c => c.User)
-                .WithMany(u => u.Categories)
+                .HasOne<User>()
+                .WithMany()
                 .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
@@ -64,33 +62,33 @@ namespace HomeBudgetShared.Data
                 .HasIndex(t => t.IsDeleted);
 
             modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.User)
-                .WithMany(u => u.Transactions)
+                .HasOne<User>()
+                .WithMany()
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.Currency)
+                .HasOne<Currency>()
                 .WithMany()
                 .HasForeignKey(t => t.CurrencyId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Transaction>()
-                .HasOne(t => t.Category)
+                .HasOne<Category>()
                 .WithMany()
                 .HasForeignKey(t => t.CategoryId)
                 .OnDelete(DeleteBehavior.SetNull);
 
             modelBuilder.Entity<TransactionItem>()
                 .HasIndex(ti => ti.TransactionId);
-            modelBuilder.Entity<TransactionItem>()
-                .HasIndex(ti => ti.IsDeleted);
 
             modelBuilder.Entity<TransactionItem>()
-                .HasOne(ti => ti.Transaction)
+                .HasOne<Transaction>()
                 .WithMany(t => t.Items)
                 .HasForeignKey(ti => ti.TransactionId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            base.OnModelCreating(modelBuilder);
         }
 
         public async Task EnsureDatabaseCreatedAsync()

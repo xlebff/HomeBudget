@@ -4,6 +4,7 @@
              xmlns:local="clr-namespace:HomeBudgetClient"
              x:Class="HomeBudgetClient.App">
     <Application.Resources>
+        <Color x:Key="PrimaryColor">#2c2638</Color>
         <ResourceDictionary>
 
             <!--

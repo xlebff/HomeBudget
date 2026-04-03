@@ -62,6 +62,8 @@ namespace HomeBudgetClient
                 options.UseSqlite(connectionString));
 
             builder.Services.AddSingleton<TransactionsViewModel>();
+
+            builder.Services.AddScoped<IBudgetDashboardDataService, BudgetDashboardDataService>();
         }
     }
 }
